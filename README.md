@@ -128,6 +128,16 @@ metadados/envelopes de resposta, nem no bundle compilado. Regra completa em
   chave. As credenciais (`FONTEDATA_API_KEY`, `APIFULL_AUTHORIZATION`) só
   existem em `process.env`, lidas por `api/*.ts` (nunca `VITE_*`, nunca
   importado por `src/`).
+- **Espelhamento de imagens** (`api/_lib/imageMirror.ts`): nenhuma imagem é
+  servida a partir do domínio de origem. Toda imagem que aparece numa
+  resposta de consulta — URL ou Base64 — é baixada/decodificada no servidor,
+  validada por magic bytes, gravada no bucket `imagens_url` e substituída no
+  payload por uma URL assinada do nosso próprio Storage, **antes** de a
+  resposta chegar ao navegador. Uma `<img src>` apontando para a CDN do
+  fornecedor entregaria o domínio dele em texto claro; por isso, quando o
+  espelhamento falha, o campo vira `null` em vez de manter a URL original.
+  O índice `mirrored_images` (origem → objeto no bucket) evita rebaixar a
+  mesma imagem a cada consulta.
 - **Normalizador central de erros** (`api/_lib/upstreamError.ts`): nenhuma
   falha do fornecedor é repassada crua ao navegador. O detalhe completo (só
   status + request-id do upstream — nunca o corpo, que pode conter dado da
@@ -187,7 +197,8 @@ api/
 │   ├── session.ts          # token opaco, hash, cookie HttpOnly/SameSite=Lax
 │   ├── auth.ts             # requireSession (protege rotas) + validateOrigin (CSRF)
 │   ├── ssrf.ts             # bloqueio de host privado/loopback ao baixar imagens de terceiro
-│   └── uploads.ts          # sniff de MIME, hash, upload/signed URL no bucket imagens_url
+│   ├── uploads.ts          # sniff de MIME, hash, upload/signed URL no bucket imagens_url
+│   └── imageMirror.ts      # espelha p/ o bucket toda imagem de uma consulta, antes de ela chegar ao navegador
 ├── auth/
 │   ├── login.ts            # POST — e-mail/senha contra tabelas próprias (sem Supabase Auth)
 │   ├── logout.ts           # POST — revoga a sessão
@@ -198,7 +209,7 @@ api/
 ├── consulta-empresa.ts     # Vercel Edge Function: proxy same-origin p/ FonteData (protegida por sessão)
 └── consulta-pessoa.ts      # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
 
-supabase/migrations/        # users, sessions, saved_queries, saved_query_images (RLS sem policies)
+supabase/migrations/        # users, sessions, saved_queries, saved_query_images, mirrored_images (RLS sem policies)
 
 scripts/create-user.ts      # cria o primeiro usuário (senha só via prompt oculto, nunca em argv/log)
 

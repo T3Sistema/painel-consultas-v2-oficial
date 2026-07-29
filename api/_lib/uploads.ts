@@ -5,6 +5,22 @@ export const BUCKET = 'imagens_url';
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
+const EXTENSION_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+/**
+ * Extensão do objeto no bucket. Importa porque a URL assinada preserva o
+ * caminho do objeto: com `.jpg` no fim, o detector de imagem do painel
+ * (`isLikelyImageUrl`, em src/lib/profileRender.ts) continua reconhecendo a
+ * URL espelhada como imagem mesmo quando o nome do campo não é sugestivo.
+ */
+export function extensionForMime(mimeType: string): string {
+  return EXTENSION_BY_MIME[mimeType] ?? 'bin';
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -101,21 +117,31 @@ export async function uploadImageToBucket(
   bytes: Uint8Array,
   mimeType: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: mimeType, upsert: false });
-  if (error) {
-    // Já existe (mesmo hash) — dedupe, não é falha.
-    if (/duplicate|already exists/i.test(error.message)) return { ok: true };
-    return { ok: false, error: error.message };
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: mimeType, upsert: false });
+    if (error) {
+      // Já existe (mesmo hash) — dedupe, não é falha.
+      if (/duplicate|already exists/i.test(error.message)) return { ok: true };
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch {
+    // Storage indisponível/não configurado: falha de upload como outra qualquer,
+    // nunca uma exceção que derruba a consulta inteira.
+    return { ok: false, error: 'storage_unavailable' };
   }
-  return { ok: true };
 }
 
 export async function createSignedImageUrl(path: string, expiresInSeconds = 300): Promise<string | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresInSeconds);
-  if (error || !data) return null;
-  return data.signedUrl;
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresInSeconds);
+    if (error || !data) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
 }
 
 export async function removeBucketImages(paths: string[]): Promise<void> {

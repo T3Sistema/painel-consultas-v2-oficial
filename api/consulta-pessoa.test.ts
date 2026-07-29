@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { requireSessionMock } = vi.hoisted(() => ({ requireSessionMock: vi.fn() }));
+const { requireSessionMock, mirrorImagesInPayloadMock } = vi.hoisted(() => ({
+  requireSessionMock: vi.fn(),
+  mirrorImagesInPayloadMock: vi.fn(),
+}));
 vi.mock('./_lib/auth', () => ({ requireSession: requireSessionMock }));
+vi.mock('./_lib/imageMirror', () => ({ mirrorImagesInPayload: mirrorImagesInPayloadMock }));
 
 import handler, { normalizeAndValidateCpf } from './consulta-pessoa';
 
@@ -49,6 +53,8 @@ describe('handler (api/consulta-pessoa)', () => {
     process.env.APIFULL_AUTHORIZATION = 'test-authorization-value';
     requireSessionMock.mockReset();
     requireSessionMock.mockResolvedValue({ ok: true, userId: 'user-1' });
+    mirrorImagesInPayloadMock.mockReset();
+    mirrorImagesInPayloadMock.mockResolvedValue({ found: 0, mirrored: 0, failed: 0 });
     fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ status: 'sucesso', dados: { SERVICE_RESPONSE: {} } }), {
         status: 200,
@@ -148,5 +154,43 @@ describe('handler (api/consulta-pessoa)', () => {
     const res = await handler(postRequest({ cpf: VALID_CPF, junk: 'x'.repeat(3000) }));
     expect(res.status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('toda resposta de sucesso passa pelo espelhamento de imagens antes de ir ao cliente', async () => {
+    await handler(postRequest({ cpf: VALID_CPF }));
+    expect(mirrorImagesInPayloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('o corpo entregue ao cliente é o payload já espelhado, não o corpo cru do upstream', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'sucesso',
+          dados: { SERVICE_RESPONSE: { cadastral: { foto: 'https://cdn.fornecedor.com/foto.jpg' } } },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    mirrorImagesInPayloadMock.mockImplementation(async (payload: Record<string, any>) => {
+      payload.dados.SERVICE_RESPONSE.cadastral.foto = 'https://proj.supabase.co/storage/v1/object/sign/x.png?token=t';
+      return { found: 1, mirrored: 1, failed: 0 };
+    });
+
+    const res = await handler(postRequest({ cpf: VALID_CPF }));
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(text).not.toContain('cdn.fornecedor.com');
+    expect(JSON.parse(text).dados.SERVICE_RESPONSE.cadastral.foto).toMatch(/^https:\/\/proj\.supabase\.co\//);
+  });
+
+  it('corpo 2xx que não é JSON vira envelope neutro em vez de ser repassado sem inspeção', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>foto em https://cdn.fornecedor.com/x.jpg</html>', { status: 200 }));
+    const res = await handler(postRequest({ cpf: VALID_CPF }));
+
+    expect(res.status).toBe(502);
+    const text = await res.text();
+    expect(text).not.toContain('cdn.fornecedor.com');
+    expect(JSON.parse(text).code).toBe('unexpected_response');
   });
 });

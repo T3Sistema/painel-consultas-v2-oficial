@@ -1,4 +1,5 @@
 import { requireSession } from './_lib/auth';
+import { mirrorImagesInPayload } from './_lib/imageMirror';
 import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from './_lib/upstreamError';
 
 export const config = { runtime: 'edge' };
@@ -61,15 +62,36 @@ export default async function handler(req: Request): Promise<Response> {
 
   const body = await upstream.text();
 
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    // Corpo 2xx que não é JSON não pode ser inspecionado em busca de imagens,
+    // então também não pode ser repassado — poderia carregar URL de origem.
+    return new Response(
+      JSON.stringify({
+        code: 'unexpected_response',
+        message: 'Não foi possível processar a resposta da consulta.',
+        id: diagnosticId(),
+      }),
+      { status: 502, headers: { 'content-type': 'application/json' } },
+    );
+  }
+
+  // Toda imagem da resposta passa a viver no nosso Storage; nenhuma URL de
+  // origem chega ao navegador (ver api/_lib/imageMirror.ts).
+  const imageStats = await mirrorImagesInPayload(payload);
+
   // Log de diagnóstico (Vercel → Deployments → Functions → Logs) — nunca CNPJ, corpo ou chave.
   console.log('[fontedata-proxy]', {
     status: upstream.status,
     durationMs: Date.now() - startedAt,
     requestId: upstream.headers.get('x-request-id') ?? undefined,
+    imagens: imageStats,
   });
 
-  return new Response(body, {
+  return new Response(JSON.stringify(payload), {
     status: upstream.status,
-    headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
+    headers: { 'content-type': 'application/json' },
   });
 }

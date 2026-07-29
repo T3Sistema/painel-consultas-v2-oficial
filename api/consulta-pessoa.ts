@@ -1,5 +1,6 @@
 import { isValidCPF, onlyDigits } from '../src/lib/format';
 import { requireSession } from './_lib/auth';
+import { mirrorImagesInPayload } from './_lib/imageMirror';
 import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from './_lib/upstreamError';
 
 export const config = { runtime: 'edge' };
@@ -106,17 +107,28 @@ export default async function handler(req: Request): Promise<Response> {
 
   const body = await upstream.text();
 
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    // Corpo 2xx que não é JSON não pode ser inspecionado em busca de imagens,
+    // então também não pode ser repassado — poderia carregar URL de origem.
+    return jsonResponse(
+      { code: 'unexpected_response', message: 'Não foi possível processar a resposta da consulta.', id: diagnosticId() },
+      502,
+    );
+  }
+
+  // Toda imagem da resposta passa a viver no nosso Storage; nenhuma URL de
+  // origem chega ao navegador (ver api/_lib/imageMirror.ts).
+  const imageStats = await mirrorImagesInPayload(payload);
+
   console.log('[apifull-proxy]', {
     status: upstream.status,
     durationMs: Date.now() - startedAt,
     requestId: upstream.headers.get('x-request-id') ?? undefined,
+    imagens: imageStats,
   });
 
-  return new Response(body, {
-    status: upstream.status,
-    headers: {
-      'content-type': upstream.headers.get('content-type') ?? 'application/json',
-      'cache-control': 'private, no-store',
-    },
-  });
+  return jsonResponse(payload, upstream.status);
 }
