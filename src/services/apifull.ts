@@ -1,10 +1,12 @@
 import { isValidCNPJ, isValidCPF, onlyDigits } from '../lib/format';
+import { isPlainObject, normalizePersonSections } from './personPayload';
 import { readNeutralErrorMessage } from './proxyError';
 
 /**
- * Perfil completo devolvido pela rota interna de consulta de pessoa.
- * `SERVICE_RESPONSE` é preservado integralmente — a origem pode adicionar
- * novas seções no futuro e nenhuma chave é descartada aqui.
+ * Perfil completo devolvido pela rota interna de consulta de pessoa, sempre
+ * no formato consolidado (mapa plano de seções). `SERVICE_RESPONSE` é
+ * preservado integralmente — a origem pode adicionar novas seções no futuro
+ * e nenhuma chave é descartada aqui.
  */
 export interface ApiFullProfile {
   SERVICE_RESPONSE: Record<string, unknown>;
@@ -28,16 +30,25 @@ export class PersonNotFoundError extends Error {
   }
 }
 
-function isValidApiFullBody(
-  data: unknown,
-): data is { status: string; dados: { SERVICE_RESPONSE: Record<string, unknown> } } {
-  if (typeof data !== 'object' || data === null) return false;
-  const d = data as Record<string, unknown>;
-  if (d.status !== 'sucesso') return false;
-  if (typeof d.dados !== 'object' || d.dados === null) return false;
-  const dados = d.dados as Record<string, unknown>;
-  const serviceResponse = dados.SERVICE_RESPONSE;
-  return typeof serviceResponse === 'object' && serviceResponse !== null && !Array.isArray(serviceResponse);
+/**
+ * Lê o corpo de uma resposta bem-sucedida e devolve sempre o mapa plano de
+ * seções, ou `null` quando o corpo não é reconhecível.
+ *
+ * Duas formas são aceitas — a consolidada (`dados.SERVICE_RESPONSE`) e a por
+ * seções (`dados.pessoa`, convertida por `normalizePersonSections`). Só o
+ * conteúdo pesquisado atravessa: nenhuma chave irmã fora dessas duas é lida,
+ * então carimbos de origem e demais metadados técnicos do corpo nunca chegam
+ * ao painel, aos exports ou ao que é salvo.
+ */
+function readServiceResponse(data: unknown): Record<string, unknown> | null {
+  if (!isPlainObject(data)) return null;
+  if (data.status !== 'sucesso') return null;
+  if (!isPlainObject(data.dados)) return null;
+
+  const { SERVICE_RESPONSE: consolidado, pessoa } = data.dados;
+  if (isPlainObject(consolidado)) return consolidado;
+  if (isPlainObject(pessoa)) return normalizePersonSections(pessoa);
+  return null;
 }
 
 /**
@@ -73,11 +84,30 @@ export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
     throw new Error('Não foi possível processar a resposta da consulta.');
   }
 
-  if (!isValidApiFullBody(data)) {
+  const serviceResponse = readServiceResponse(data);
+  if (!serviceResponse) {
     throw new Error('Consulta sem sucesso ou em formato inesperado.');
   }
 
-  return { SERVICE_RESPONSE: data.dados.SERVICE_RESPONSE };
+  return { SERVICE_RESPONSE: serviceResponse };
+}
+
+/**
+ * `true` quando a resposta traz a seção de sociedades — mesmo vazia. Serve
+ * para o grafo distinguir "esta pessoa não tem sociedades" de "esta consulta
+ * não traz participação societária", que dão o mesmo `extractSociedades()`
+ * vazio mas significam coisas diferentes para quem está investigando.
+ */
+export function hasSociedadesSection(profile: ApiFullProfile): boolean {
+  return Array.isArray(profile.SERVICE_RESPONSE.sociedades);
+}
+
+/** Nome da pessoa consultada, quando a resposta o traz — usado como rótulo do nó raiz. */
+export function extractPersonName(profile: ApiFullProfile): string | undefined {
+  const cadastral = profile.SERVICE_RESPONSE.cadastral;
+  if (!isPlainObject(cadastral)) return undefined;
+  const nome = cadastral.nome;
+  return typeof nome === 'string' && nome.trim() !== '' ? nome.trim() : undefined;
 }
 
 /**

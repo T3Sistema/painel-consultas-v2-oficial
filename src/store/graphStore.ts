@@ -20,7 +20,13 @@ import {
   type ForceSettings,
 } from '../lib/forceSim';
 import { FonteDataProvider, mapRelation, mapStatus, parseBrDate } from '../services/fontedata';
-import { extractSociedades, type ApiFullSociedade, type ApiFullProfile } from '../services/apifull';
+import {
+  extractPersonName,
+  extractSociedades,
+  hasSociedadesSection,
+  type ApiFullSociedade,
+  type ApiFullProfile,
+} from '../services/apifull';
 import { usePersonProfileStore } from './personProfileStore';
 import { extractPersonPhotoUrl } from '../lib/personPhoto';
 import { stripHardFields } from '../lib/mask';
@@ -485,6 +491,11 @@ async function processPendingSociedades(
   return { succeededCount, failedCount };
 }
 
+/** Rótulo legível de um nó de pessoa para mensagens ao usuário. */
+function nomeDoNo(node: GraphNode): string {
+  return node.person?.nome ?? formatCPF(onlyDigits(node.person?.cpf ?? ''));
+}
+
 /**
  * Expande um nó pessoa: perfil completo via APIFull (cache/dedup real em
  * `personProfileStore`, compartilhado com o clique no painel) → relação
@@ -518,7 +529,14 @@ async function expandPersonViaProfile(
   const sociedades = extractSociedades(profile);
   if (sociedades.length === 0) {
     node.expanded = true;
-    set({ nodes: [...get().nodeIndex.values()] });
+    // Sem a seção de sociedades a camada não tem como crescer — avisa, em vez
+    // de deixar o nó "expandido" e o mapa parado sem explicação nenhuma.
+    set({
+      nodes: [...get().nodeIndex.values()],
+      ...(hasSociedadesSection(profile)
+        ? {}
+        : { notice: `${nomeDoNo(node)}: esta consulta não traz participação societária. O perfil completo continua disponível no painel.` }),
+    });
     return;
   }
 
@@ -729,6 +747,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const nome =
         sociedades.find((s) => onlyDigits(s.documentoSocio) === digits)?.nomeSocio ??
         sociedades[0]?.nomeSocio ??
+        extractPersonName(profile) ??
         formatCPF(digits);
 
       const rootId = personId(digits);
@@ -753,6 +772,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           layerLoading: false,
           searchPhase: 'done',
           unsavedChanges: true,
+          ...(hasSociedadesSection(profile)
+            ? {}
+            : { notice: `${nome}: esta consulta não traz participação societária, então o mapa fica só com a pessoa. O perfil completo está no painel.` }),
         });
         return;
       }
