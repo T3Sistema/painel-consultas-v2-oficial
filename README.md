@@ -86,6 +86,30 @@ camada. Só `sociedades[]` altera o grafo — o restante do perfil da APIFull
 (documentos, contatos, vazamentos etc.) aparece só no painel lateral da
 pessoa, nunca vira nó/aresta.
 
+**Dois formatos de resposta para a consulta de pessoa.** A APIFull devolve o
+perfil ora consolidado em `dados.SERVICE_RESPONSE` (mapa plano cujas chaves
+de topo são as do schema de páginas), ora agrupado em blocos sob
+`dados.pessoa` (`identificacao`, `cadastro`, `contatos`, `documentos`,
+`financeiro`, `vinculos`, `juridico`, `seguranca`, `ocupacao`, `veiculos`).
+`src/services/personPayload.ts` converte a segunda forma na primeira, então
+todo o resto do app (schema, categorias, foto, imagens salvas, grafo) lê um
+formato só. Três regras, cobertas por teste:
+
+1. **Só o conteúdo pesquisado atravessa.** O adaptador lê exclusivamente
+   `dados.pessoa` — as chaves irmãs (carimbo de origem, identificador de
+   rota, lista de bases acionadas) nunca são copiadas, senão apareceriam no
+   painel/exports e violariam a neutralidade do frontend.
+2. **Nada é inventado.** Campo nulo/ausente é omitido, nunca preenchido; só
+   há renomeação de chave e normalização de data (`"AAAA-MM-DD hh:mm:ss"` →
+   grafia que `formatDate` aceita).
+3. **Nada é perdido.** Bloco ou chave desconhecida é repassado com o nome que
+   tinha e cai nas seções genéricas do schema.
+
+O formato por blocos **não traz `sociedades[]`**, então o grafo não tem como
+crescer a partir dele. Para não confundir isso com "esta pessoa não tem
+sociedades", `hasSociedadesSection()` distingue os dois casos e o grafo
+exibe um aviso em vez de abrir um mapa vazio sem explicação.
+
 Clicar numa pessoa carrega o perfil completo (cache/dedup real por CPF em
 `src/store/personProfileStore.ts`, compartilhado com a expansão de camada)
 mas **não** expande o grafo — isso só acontece ao avançar de camada. Uma

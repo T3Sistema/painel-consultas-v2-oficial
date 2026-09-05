@@ -785,6 +785,72 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
   });
 });
 
+describe('resposta sem a seção de sociedades (conteúdo agrupado em seções)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  // Fixture sintética — mesma forma do envelope por seções, sem sociedades.
+  const sectionedPerson = (nome: string) =>
+    jsonResponse({
+      status: 'sucesso',
+      dados: {
+        pessoa: {
+          identificacao: { cpf: PERSON_CPF, nome },
+          contatos: { telefones: ['(11) 4002-8922'] },
+        },
+      },
+    });
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. o nó raiz é rotulado com o nome da pessoa, não com o CPF', async () => {
+    fetchMock.mockResolvedValue(sectionedPerson('FULANO DE TAL'));
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    expect(state.nodeIndex.get(personId(PERSON_CPF))?.label).toBe('FULANO DE TAL');
+    expect(state.searchPhase).toBe('done');
+    expect(state.nodes).toHaveLength(1);
+  });
+
+  it('2. avisa que não há participação societária, em vez de deixar o mapa vazio sem explicação', async () => {
+    fetchMock.mockResolvedValue(sectionedPerson('FULANO DE TAL'));
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    expect(useGraphStore.getState().notice).toContain('participação societária');
+  });
+
+  it('3. expandir um nó nessas condições também avisa, e não fica em silêncio', async () => {
+    fetchMock.mockResolvedValue(sectionedPerson('FULANO DE TAL'));
+    const node = putPersonNode(1);
+
+    await useGraphStore.getState().expandNode(node.id);
+
+    expect(node.expanded).toBe(true);
+    expect(useGraphStore.getState().notice).toContain('participação societária');
+  });
+
+  it('4. com a seção presente e vazia, segue em silêncio (zero sociedades é resposta, não lacuna)', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/consulta-pessoa')) return apiFullSuccess([]);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    expect(useGraphStore.getState().notice).toBeNull();
+  });
+});
+
 describe('foto da pessoa — atualiza o nó automaticamente quando o perfil resolve', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 

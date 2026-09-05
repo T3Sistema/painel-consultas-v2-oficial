@@ -141,6 +141,7 @@ export const PROFILE_PAGES: PageSpec[] = [
       { title: 'Fotos encontradas', source: 'fotos', kind: 'generic' },
       { title: 'Fotos adicionais', source: 'extraFotos', kind: 'generic' },
       { title: 'Documentos digitalizados', source: 'docsBase64', kind: 'generic' },
+      { title: 'Outros documentos', source: 'documentos', kind: 'generic' },
     ],
   },
   {
@@ -204,6 +205,8 @@ export const PROFILE_PAGES: PageSpec[] = [
       ] },
       { title: 'Planos móveis', source: 'planosMoveis', kind: 'generic' },
       { title: 'Contas de energia', source: 'energias', kind: 'generic' },
+      { title: 'Score de crédito', source: 'score', kind: 'generic' },
+      { title: 'Outros dados financeiros', source: 'financeiro', kind: 'generic' },
       { title: 'Perfil de consumo (propensões)', source: 'propensoes', kind: 'flags' },
     ],
   },
@@ -250,6 +253,7 @@ export const PROFILE_PAGES: PageSpec[] = [
       { title: 'LinkedIn', source: 'linkedin', kind: 'generic' },
       { title: 'Exposição política (PPE)', source: 'ppe', kind: 'generic' },
       { title: 'Filiações e histórico político', source: 'politica', kind: 'generic' },
+      { title: 'Ocupação', source: 'ocupacao', kind: 'generic' },
     ],
   },
   {
@@ -295,6 +299,7 @@ export const PROFILE_PAGES: PageSpec[] = [
       { title: 'Processos judiciais', source: 'processos', kind: 'generic', alwaysShow: true, emptyText: 'Nenhum processo judicial encontrado.' },
       { title: 'Peças / mandados (BNMP)', source: 'pecasBnmp', kind: 'generic' },
       { title: 'Vínculos por processos', source: 'vinculosPorProcessos', kind: 'generic' },
+      { title: 'Outros registros jurídicos', source: 'juridico', kind: 'generic' },
     ],
   },
   {
