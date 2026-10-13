@@ -3,19 +3,37 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { requireSessionMock } = vi.hoisted(() => ({ requireSessionMock: vi.fn() }));
 vi.mock('./_lib/auth', () => ({ requireSession: requireSessionMock }));
 
-import handler, { buildFonteDataUrl } from './consulta-empresa';
+import handler, { buildCadastroPjUrl, readCadastroPjKey } from './consulta-empresa';
 
-describe('buildFonteDataUrl', () => {
-  it('monta a URL exata esperada pela FonteData', () => {
-    const url = buildFonteDataUrl('33260563000178');
+describe('buildCadastroPjUrl', () => {
+  it('monta a URL exata esperada pela origem', () => {
+    const url = buildCadastroPjUrl('33260563000178');
 
-    expect(url.origin).toBe('https://app.fontedata.com');
+    expect(url.origin).toBe('https://app.dabradata.com');
     expect(url.pathname).toBe('/api/v1/consulta/cadastro-pj-plus');
     expect(url.searchParams.get('cnpj')).toBe('33260563000178');
     expect(url.searchParams.has('CNPJ')).toBe(false);
     expect(url.toString()).toBe(
-      'https://app.fontedata.com/api/v1/consulta/cadastro-pj-plus?cnpj=33260563000178',
+      'https://app.dabradata.com/api/v1/consulta/cadastro-pj-plus?cnpj=33260563000178',
     );
+  });
+});
+
+describe('readCadastroPjKey', () => {
+  afterEach(() => {
+    delete process.env.DABRADATA_API_KEY;
+    delete process.env.FONTEDATA_API_KEY;
+  });
+
+  it('prefere a variável nova e aceita a anterior como reserva', () => {
+    process.env.FONTEDATA_API_KEY = 'antiga';
+    expect(readCadastroPjKey()).toBe('antiga');
+    process.env.DABRADATA_API_KEY = 'nova';
+    expect(readCadastroPjKey()).toBe('nova');
+  });
+
+  it('sem nenhuma das duas, devolve undefined', () => {
+    expect(readCadastroPjKey()).toBeUndefined();
   });
 });
 
@@ -45,6 +63,7 @@ describe('handler (api/consulta-empresa)', () => {
     vi.unstubAllGlobals();
     logSpy.mockRestore();
     delete process.env.FONTEDATA_API_KEY;
+    delete process.env.DABRADATA_API_KEY;
   });
 
   it('1. sem sessão válida retorna a resposta de requireSession sem chamar a FonteData', async () => {
@@ -116,7 +135,7 @@ describe('handler (api/consulta-empresa)', () => {
     await handler(req('33260563000178'));
     for (const call of logSpy.mock.calls) {
       // remove a própria tag do log (rótulo interno fixo) antes de checar o restante do payload
-      const serialized = JSON.stringify(call).replace(/\[fontedata-proxy\]/g, '');
+      const serialized = JSON.stringify(call).replace(/\[cnpj-proxy\]/g, '');
       expect(serialized).not.toMatch(/fornecedor|saldo|chave da api|expirada/i);
     }
   });

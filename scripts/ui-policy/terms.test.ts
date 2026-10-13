@@ -23,6 +23,8 @@ describe('FORBIDDEN_TERMS — casos exigidos pela auditoria', () => {
 
   it('2. URL externa (domínio do fornecedor)', () => {
     expect(violationsFor('"https://app.fontedata.com/api/v1/consulta"').some((v) => v.termId === 'vendor-domain')).toBe(true);
+    expect(violationsFor('"https://app.dabradata.com/api/v1/consulta"').some((v) => v.termId === 'vendor-domain')).toBe(true);
+    expect(violationsFor('"Erro na DabraData"').some((v) => v.termId === 'vendor-name-dabradata')).toBe(true);
     expect(violationsFor('"https://api.apifull.com.br/api/cpf-ultra"').some((v) => v.termId === 'vendor-domain')).toBe(true);
   });
 

@@ -1,11 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
 import { caretPositionForDigitCount, isValidCNPJ, isValidCPF, maskCNPJ, maskCPF, onlyDigits, formatDate } from '../lib/format';
 import { applyMask } from '../lib/mask';
 import { listSavedQueries, getSavedQuery, type SavedQuerySummary } from '../services/savedQueries';
-
-const LOGO_URL = 'https://aisfizoyfpcisykarrnt.supabase.co/storage/v1/object/public/imagens/LOGO%20TRIAD3%20.png';
+import { LogoCore, SpotlightCard, Typewriter } from './home/HomeParts';
+import { CountUp } from './painel/MotionBits';
 
 const LOCKED_TABS = ['SMS', 'Placa', 'Email', 'Nome'];
 
@@ -66,80 +66,146 @@ function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
   };
 
   return (
-    <div className="mt-8 w-full border-t border-slate-300 pt-4 dark:border-slate-700">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Consultas recentes</span>
-        <button
-          type="button"
-          onClick={() => setHidden((h) => !h)}
-          className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
-        >
+    <motion.section
+      className="home-recent"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 1.05, ease: [0.2, 0.9, 0.3, 1] }}
+    >
+      <div className="home-recent-head">
+        <span className="home-kicker">
+          <i />
+          Consultas recentes
+        </span>
+        <button type="button" onClick={() => setHidden((h) => !h)} className="home-ghost-btn">
           <EyeIcon crossed={hidden} />
           {hidden ? 'Ocultas' : 'Reveladas'}
         </button>
       </div>
 
-      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="home-recent-error">{error}</p>}
 
-      <ul className="mt-3 space-y-1.5">
-        {items === null && <li className="text-xs text-slate-400">Carregando…</li>}
-        {items?.length === 0 && <li className="text-xs text-slate-400">Nenhuma consulta recente.</li>}
-        {items?.map((item) => {
+      <ul className="home-recent-list">
+        {items === null &&
+          [0, 1, 2].map((i) => (
+            <li key={i} className="home-skeleton" aria-hidden="true">
+              <span />
+            </li>
+          ))}
+        {items === null && <li className="sr-only">Carregando…</li>}
+        {items?.length === 0 && <li className="home-recent-empty">Nenhuma consulta recente.</li>}
+        {items?.map((item, i) => {
           const label = item.titulo?.trim() || item.cnpj_raiz;
           return (
-            <li key={item.id}>
+            <motion.li
+              key={item.id}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, delay: 0.05 * i }}
+            >
               <button
                 type="button"
                 onClick={() => void handleOpen(item.id)}
                 disabled={openingId === item.id}
-                className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white disabled:opacity-50 dark:hover:bg-slate-800"
+                className="home-recent-item"
               >
-                <span className="text-slate-700 dark:text-slate-200">{applyMask(label, 'soft', !hidden)}</span>
-                <span className="text-xs text-slate-400">
-                  {openingId === item.id ? 'Abrindo…' : formatDate(item.created_at)}
-                </span>
+                <span className="home-recent-dot" aria-hidden="true" />
+                <span className="home-recent-label">{applyMask(label, 'soft', !hidden)}</span>
+                <span className="home-recent-date">{openingId === item.id ? 'Abrindo…' : formatDate(item.created_at)}</span>
+                <svg className="home-recent-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
               </button>
-            </li>
+            </motion.li>
           );
         })}
       </ul>
 
       {onOpenAll && (
-        <div className="mt-4 flex justify-center">
-          <button
-            type="button"
-            onClick={onOpenAll}
-            className="group flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-cyan-500/40 dark:hover:bg-slate-700 dark:hover:text-cyan-300"
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h16v16H4z" />
-              <path d="M8 4v16M4 9h4" />
-            </svg>
-            Ver todas as consultas salvas
-            <svg
-              viewBox="0 0 24 24"
-              width="12"
-              height="12"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="transition group-hover:translate-x-0.5"
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
-        </div>
+        <button type="button" onClick={onOpenAll} className="home-all-btn">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4h16v16H4z" />
+            <path d="M8 4v16M4 9h4" />
+          </svg>
+          Ver todas as consultas salvas
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" className="home-all-arrow">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
       )}
-    </div>
+    </motion.section>
   );
 }
 
-/**
- * Tela inicial: informa o CNPJ raiz. Enquanto a busca está em andamento
- * (`loading`), o App renderiza `LoadingScreen` em vez deste componente —
- * por isso não há feedback de progresso aqui, só o resultado (erro) ou a
- * tela de decisão de falha parcial.
- */
+const PHRASES = [
+  'Mapeie empresas, sócios e conexões em segundos.',
+  'Siga as pessoas. Siga as empresas. Veja o que liga uma à outra.',
+  'Processos, parentes e participações num único mapa.',
+  'Do CNPJ ao dossiê completo, camada por camada.',
+];
+
+const FEATURES = [
+  {
+    title: 'Mapa societário',
+    text: 'Empresas, sócios e participações revelados em camadas.',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <circle cx="4.5" cy="6" r="2" />
+        <circle cx="19.5" cy="6" r="2" />
+        <circle cx="12" cy="20.5" r="2" />
+        <path d="M6.2 7.2 9.6 10.4M17.8 7.2l-3.4 3.2M12 15v3.5" />
+      </>
+    ),
+  },
+  {
+    title: 'Rede judicial e familiar',
+    text: 'Processos, contrapartes e parentes ligados direto no mapa.',
+    icon: <path d="M12 3v18M7 21h10M5 7h14M5 7l-3 6a3 3 0 0 0 6 0L5 7Zm14 0-3 6a3 3 0 0 0 6 0l-3-6Z" />,
+  },
+  {
+    title: 'Dossiê completo',
+    text: 'Cadastro, contatos, score e histórico num só lugar.',
+    icon: (
+      <>
+        <rect x="4" y="3" width="16" height="18" rx="2.5" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </>
+    ),
+  },
+];
+
+/** Anel que se preenche conforme os dígitos são digitados (verde quando o documento é válido). */
+function DigitsRing({ count, total, state }: { count: number; total: number; state: 'idle' | 'ok' | 'bad' }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className={`digits-ring ${state}`} aria-hidden="true">
+      <svg viewBox="0 0 36 36" width="36" height="36">
+        <circle cx="18" cy="18" r={r} className="digits-track" />
+        <circle
+          cx="18"
+          cy="18"
+          r={r}
+          className="digits-fill"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - count / total)}
+        />
+      </svg>
+      {state === 'ok' ? (
+        <svg className="digits-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.8">
+          <path d="m5 12 5 5 9-10" />
+        </svg>
+      ) : (
+        <svg className="digits-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-4-4" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => void }) {
   const startSearch = useGraphStore((s) => s.startSearch);
   const startPersonSearch = useGraphStore((s) => s.startPersonSearch);
@@ -155,6 +221,22 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
   const [cnpj, setCnpj] = useState('');
   const [cpf, setCpf] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [shake, setShake] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // "/" ou Ctrl/⌘+K levam direto ao campo de busca
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const switchMode = (m: 'cnpj' | 'cpf') => {
     setMode(m);
@@ -177,16 +259,21 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
     });
   };
 
+  const fail = (msg: string) => {
+    setValidationError(msg);
+    setShake((n) => n + 1);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode === 'cnpj') {
       const digits = onlyDigits(cnpj);
       if (digits.length !== 14) {
-        setValidationError('Informe um CNPJ com 14 dígitos.');
+        fail('Informe um CNPJ com 14 dígitos.');
         return;
       }
       if (!isValidCNPJ(digits)) {
-        setValidationError('CNPJ inválido (dígitos verificadores não conferem).');
+        fail('CNPJ inválido (dígitos verificadores não conferem).');
         return;
       }
       setValidationError(null);
@@ -194,11 +281,11 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
     } else {
       const digits = onlyDigits(cpf);
       if (digits.length !== 11) {
-        setValidationError('Informe um CPF com 11 dígitos.');
+        fail('Informe um CPF com 11 dígitos.');
         return;
       }
       if (!isValidCPF(digits)) {
-        setValidationError('CPF inválido (dígitos verificadores não conferem).');
+        fail('CPF inválido (dígitos verificadores não conferem).');
         return;
       }
       setValidationError(null);
@@ -206,161 +293,233 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
     }
   };
 
+  const value = mode === 'cnpj' ? cnpj : cpf;
+  const digits = onlyDigits(value).length;
+  const total = mode === 'cnpj' ? 14 : 11;
+  const complete = digits === total;
+  const valid = complete && (mode === 'cnpj' ? isValidCNPJ(onlyDigits(value)) : isValidCPF(onlyDigits(value)));
+  const ringState: 'idle' | 'ok' | 'bad' = !complete ? 'idle' : valid ? 'ok' : 'bad';
+  const tabs: { id: 'cnpj' | 'cpf'; label: string }[] = [
+    { id: 'cnpj', label: 'CNPJ' },
+    { id: 'cpf', label: 'Consulta Avançada' },
+  ];
+  const ease = [0.2, 0.9, 0.3, 1] as const;
+
   return (
-    <div className="flex min-h-full flex-col items-center p-6 pt-12">
+    <div className="home-main">
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex w-full max-w-3xl flex-col items-center"
+        className="home-hero"
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.9, ease }}
       >
-        <div className="mb-3 h-40 w-40 flex-none overflow-hidden rounded-full bg-black">
-          <img src={LOGO_URL} alt="TRIAD3" className="h-full w-full object-contain" />
-        </div>
-        <h1 className="mb-6 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <LogoCore />
+
+        <motion.div
+          className="home-badge"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+        >
+          <i />
+          Inteligência societária · judicial · cadastral
+        </motion.div>
+
+        <h1 className="home-title" data-text="PAINEL DE CONSULTAS">
           PAINEL DE CONSULTAS
         </h1>
 
-        <div className="mb-5 flex flex-nowrap items-center justify-center gap-x-3 whitespace-nowrap rounded-2xl bg-white px-6 py-3 text-sm shadow-md dark:bg-slate-800">
-          <button
-            type="button"
-            onClick={() => switchMode('cnpj')}
-            className={
-              mode === 'cnpj'
-                ? 'rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900'
-                : 'rounded-full px-4 py-1.5 font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-            }
-          >
-            CNPJ
-          </button>
-          <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />
-          <button
-            type="button"
-            onClick={() => switchMode('cpf')}
-            className={
-              mode === 'cpf'
-                ? 'rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900'
-                : 'rounded-full px-4 py-1.5 font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-            }
-          >
-            Consulta Avançada
-          </button>
-          {LOCKED_TABS.map((tab) => (
-            <span key={tab} className="flex items-center gap-3 text-slate-400">
-              <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />
-              <span className="flex items-center gap-1" title="Ainda não disponível">
-                {tab} <LockIcon />
-              </span>
-            </span>
-          ))}
-        </div>
+        <Typewriter phrases={PHRASES} className="home-sub" />
+      </motion.div>
 
-        <form onSubmit={submit} className="w-full space-y-4">
-          <div className="flex items-center gap-2 rounded-2xl bg-white p-2 pl-4 shadow-lg ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-600">
-            <svg className="h-5 w-5 flex-none text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-4-4" />
-            </svg>
+      <motion.div
+        className="home-tabs"
+        role="group"
+        aria-label="Tipo de consulta"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, delay: 0.45, ease }}
+      >
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => switchMode(t.id)}
+            className={`home-tab ${mode === t.id ? 'active' : ''}`}
+          >
+            {mode === t.id && <motion.span layoutId="home-tab-pill" className="home-tab-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
+            <span className="home-tab-text">{t.label}</span>
+          </button>
+        ))}
+        <span className="home-tabs-sep" aria-hidden="true" />
+        {LOCKED_TABS.map((tab) => (
+          <span key={tab} className="home-tab locked" title="Em breve">
+            <span>{tab}</span>
+            <LockIcon />
+          </span>
+        ))}
+      </motion.div>
+
+      <motion.form
+        onSubmit={submit}
+        className="home-form"
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, delay: 0.55, ease }}
+      >
+        <motion.div
+          key={shake}
+          className={`home-search ${focused ? 'is-focused' : ''} ${ringState}`}
+          animate={shake ? { x: [0, -12, 11, -8, 6, -3, 0] } : undefined}
+          transition={{ duration: 0.45 }}
+        >
+          <span className="home-search-beam" aria-hidden="true" />
+          <div className="home-search-inner">
+            <DigitsRing count={digits} total={total} state={ringState} />
             {mode === 'cnpj' ? (
-              <input
-                id="cnpj"
-                value={cnpj}
-                onChange={handleMaskedChange(maskCNPJ, setCnpj)}
-                placeholder="00.000.000/0000-00"
-                inputMode="numeric"
-                className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
-                autoFocus
-              />
-            ) : (
-              <input
-                id="cpf"
-                value={cpf}
-                onChange={handleMaskedChange(maskCPF, setCpf)}
-                placeholder="000.000.000-00"
-                inputMode="numeric"
-                className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
-                autoFocus
-              />
-            )}
-            <button
-              type="submit"
-              className="flex flex-none items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-cyan-300"
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <motion.input
+                  key="cnpj"
+                  ref={inputRef}
+                  id="cnpj"
+                  value={cnpj}
+                  onChange={handleMaskedChange(maskCNPJ, setCnpj)}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  placeholder="00.000.000/0000-00"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="home-input"
+                  autoFocus
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                />
+              ) : (
+                <motion.input
+                  key="cpf"
+                  ref={inputRef}
+                  id="cpf"
+                  value={cpf}
+                  onChange={handleMaskedChange(maskCPF, setCpf)}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="home-input"
+                  autoFocus
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                />
+              )}
+            <span className={`home-count ${ringState}`} aria-hidden="true">
+              {digits}/{total}
+            </span>
+            <button type="submit" className="home-go">
+              <span className="home-go-shine" aria-hidden="true" />
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-4-4" />
               </svg>
               Buscar
             </button>
           </div>
+        </motion.div>
 
-          <div className="flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 17l6-6 4 4 8-8M21 3h-6M21 3v6" />
-              </svg>
-              +67M empresas homologadas
-            </span>
-            <span className="h-3 w-px bg-slate-300 dark:bg-slate-600" />
-            <span className="flex items-center gap-1.5">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-                <ellipse cx="12" cy="5" rx="8" ry="3" />
-                <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
-              </svg>
-              +1M requisições diárias
-            </span>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 text-xs">
-            <label htmlFor="maxDepth" className="text-slate-400">
-              Limite de níveis:
-            </label>
+        <div className="home-meta">
+          <span className="home-stat">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 17l6-6 4 4 8-8M21 3h-6M21 3v6" />
+            </svg>
+            <b>
+              <CountUp value={67} format={(v) => `+${Math.round(v)}M`} duration={1600} delay={700} />
+            </b>
+            empresas homologadas
+          </span>
+          <span className="home-meta-sep" />
+          <span className="home-stat">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+              <ellipse cx="12" cy="5" rx="8" ry="3" />
+              <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+            </svg>
+            <b>
+              <CountUp value={1} format={(v) => `+${Math.max(0, Math.round(v))}M`} duration={1200} delay={900} />
+            </b>
+            requisições diárias
+          </span>
+          <span className="home-meta-sep" />
+          <label htmlFor="maxDepth" className="home-depth">
+            Limite de níveis
             <select
               id="maxDepth"
               value={maxDepth === Infinity ? 'inf' : maxDepth}
               onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
-              className="rounded-md border border-slate-200 bg-transparent px-1.5 py-0.5 text-slate-500 dark:border-slate-700 dark:text-slate-400"
             >
               <option value={3}>3 níveis</option>
               <option value={5}>5 níveis</option>
               <option value={10}>10 níveis</option>
               <option value="inf">Ilimitado</option>
             </select>
-          </div>
+          </label>
+          <span className="home-kbd" aria-hidden="true">
+            <kbd>/</kbd> para buscar
+          </span>
+        </div>
 
+        <AnimatePresence>
           {(validationError || error) && (
-            <p className="rounded-lg bg-red-50 p-2.5 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
+            <motion.p
+              className="home-alert error"
+              initial={{ opacity: 0, y: -6, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
               {validationError ?? error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {searchPhase === 'awaiting-decision' && (
+          <div className="home-alert warn">
+            <p>
+              {searchFailedCpfs.length} de {searchProfilesTotal} perfil(is) não puderam ser carregados agora. O mapa
+              ainda não foi aberto.
             </p>
-          )}
-
-          {searchPhase === 'awaiting-decision' && (
-            <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-              <p>
-                {searchFailedCpfs.length} de {searchProfilesTotal} perfil(is) não puderam ser carregados agora. O mapa
-                ainda não foi aberto.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void retryFailedSearchProfiles()}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
-                >
-                  Tentar novamente
-                </button>
-                <button
-                  type="button"
-                  onClick={continueWithAvailableData}
-                  className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/50"
-                >
-                  Continuar com os dados disponíveis
-                </button>
-              </div>
+            <div className="home-alert-actions">
+              <button type="button" onClick={() => void retryFailedSearchProfiles()} className="home-alert-primary">
+                Tentar novamente
+              </button>
+              <button type="button" onClick={continueWithAvailableData} className="home-alert-secondary">
+                Continuar com os dados disponíveis
+              </button>
             </div>
-          )}
-        </form>
+          </div>
+        )}
+      </motion.form>
 
-        <RecentQueries onOpenAll={onOpenSavedQueries} />
-      </motion.div>
+      <div className="home-features">
+        {FEATURES.map((f, i) => (
+          <motion.div
+            key={f.title}
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.75 + i * 0.1, ease }}
+          >
+            <SpotlightCard className="home-feature">
+              <span className="home-feature-icon">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  {f.icon}
+                </svg>
+              </span>
+              <b>{f.title}</b>
+              <small>{f.text}</small>
+            </SpotlightCard>
+          </motion.div>
+        ))}
+      </div>
+
+      <RecentQueries onOpenAll={onOpenSavedQueries} />
     </div>
   );
 }

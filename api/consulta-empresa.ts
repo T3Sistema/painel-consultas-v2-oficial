@@ -5,14 +5,23 @@ import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from 
 export const config = { runtime: 'edge' };
 
 /** Testável isoladamente (ver api/consulta-empresa.test.ts) */
-export function buildFonteDataUrl(cnpj: string): URL {
-  const url = new URL('https://app.fontedata.com/api/v1/consulta/cadastro-pj-plus');
-  url.searchParams.set('cnpj', cnpj); // case-sensitive na FonteData — minúsculo, confirmado na doc deles
+export function buildCadastroPjUrl(cnpj: string): URL {
+  const url = new URL('https://app.dabradata.com/api/v1/consulta/cadastro-pj-plus');
+  url.searchParams.set('cnpj', cnpj); // minúsculo — case-sensitive na origem
   return url;
 }
 
 /**
- * Proxy same-origin para a FonteData (cadastro-pj-plus), protegido por
+ * Chave da consulta de CNPJ. `DABRADATA_API_KEY` é a atual; `FONTEDATA_API_KEY`
+ * continua aceita como reserva, para um ambiente já configurado não parar de
+ * funcionar enquanto a variável nova não é cadastrada.
+ */
+export function readCadastroPjKey(): string | undefined {
+  return process.env.DABRADATA_API_KEY || process.env.FONTEDATA_API_KEY || undefined;
+}
+
+/**
+ * Proxy same-origin para a consulta cadastro-pj-plus, protegido por
  * sessão (ver api/_lib/auth.ts): evita CORS ao chamar a partir do navegador e
  * mantém a chave fora do bundle client-side. No sucesso (2xx), repassa o
  * corpo do upstream sem reinterpretar (é o dado que a UI precisa). Numa
@@ -32,7 +41,7 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const apiKey = process.env.FONTEDATA_API_KEY;
+  const apiKey = readCadastroPjKey();
   if (!apiKey) {
     return new Response(
       JSON.stringify({
@@ -44,7 +53,7 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const url = buildFonteDataUrl(cnpj);
+  const url = buildCadastroPjUrl(cnpj);
   const startedAt = Date.now();
   let upstream: Response;
   try {
@@ -53,11 +62,11 @@ export default async function handler(req: Request): Promise<Response> {
       headers: { 'X-API-Key': apiKey, Accept: 'application/json' },
     });
   } catch {
-    return normalizeUnreachableError('fontedata-proxy', startedAt, 'unreachable');
+    return normalizeUnreachableError('cnpj-proxy', startedAt, 'unreachable');
   }
 
   if (!upstream.ok) {
-    return normalizeUpstreamError('fontedata-proxy', upstream, startedAt);
+    return normalizeUpstreamError('cnpj-proxy', upstream, startedAt);
   }
 
   const body = await upstream.text();
@@ -83,7 +92,7 @@ export default async function handler(req: Request): Promise<Response> {
   const imageStats = await mirrorImagesInPayload(payload);
 
   // Log de diagnóstico (Vercel → Deployments → Functions → Logs) — nunca CNPJ, corpo ou chave.
-  console.log('[fontedata-proxy]', {
+  console.log('[cnpj-proxy]', {
     status: upstream.status,
     durationMs: Date.now() - startedAt,
     requestId: upstream.headers.get('x-request-id') ?? undefined,
