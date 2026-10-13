@@ -5,6 +5,8 @@ import App from './App';
 import './index.css';
 import './painel.css';
 import './painel-noite.css';
+import './painel-detalhe-noite.css';
+import './painel-detalhe-fx.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
