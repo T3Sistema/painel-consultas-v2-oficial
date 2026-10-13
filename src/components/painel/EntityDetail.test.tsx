@@ -114,6 +114,7 @@ const PAGE_LABELS = [
   'Contatos & Endereços',
   'Financeiro & Consumo',
   'Carreira & Negócios',
+  'Jurídico',
   'Cyber Sec & Vazamentos',
   'Presença & Viagens',
   'Bens & Patrimônio',

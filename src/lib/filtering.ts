@@ -1,4 +1,4 @@
-import type { GraphFilters, GraphLink, GraphNode } from '../types/graph';
+import { JUDICIAL_RELATIONS, type GraphFilters, type GraphLink, type GraphNode, type RelationType } from '../types/graph';
 
 const resolveId = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
 
@@ -33,10 +33,22 @@ export function applyFilters(
 
   const visibleIds = new Set(nodes.filter(nodeVisible).map((n) => n.id));
 
+  // Relações de contexto desligadas saem da aresta; se não sobrar nenhuma, a aresta some.
+  const hidden = new Set<RelationType>([
+    ...(filters.showJudicial === false ? JUDICIAL_RELATIONS : []),
+    ...(filters.showFamily === false ? (['PARENTE'] as const) : []),
+  ]);
+  const linkSurvivesContext = (l: GraphLink): boolean => {
+    if (hidden.size === 0) return true;
+    const rels = l.meta.relations?.length ? l.meta.relations : [l.type];
+    return rels.some((r) => !hidden.has(r));
+  };
+
   const visibleLinks = links.filter((l) => {
     const s = resolveId(l.source);
     const t = resolveId(l.target);
     if (!visibleIds.has(s) || !visibleIds.has(t)) return false;
+    if (!linkSurvivesContext(l)) return false;
     if (filters.minParticipation > 0 && (l.meta.percentual ?? 0) < filters.minParticipation) return false;
     if (filters.onlyPartners && l.type !== 'SOCIO' && l.type !== 'PARTICIPACAO') return false;
     if (filters.onlyAdmins && l.type !== 'ADMINISTRADOR') {

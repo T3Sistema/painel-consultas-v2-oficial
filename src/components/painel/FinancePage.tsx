@@ -5,6 +5,8 @@ import { fmtText, getPath, isEmptyValue } from '../../lib/profileFormat';
 import { classifyKey } from '../../lib/mask';
 import { MaskedValue, ProfileCardEntries, countRecords } from './ProfileValue';
 import { ProfileSectionView, sectionHasContent } from './ProfileSections';
+import { ScoreGauge, bandLabel, readScores, scoreConsumedKeys } from './MotionBits';
+import { formatCurrency } from '../../lib/format';
 
 /**
  * Aba "Financeiro & Consumo": um "cockpit" de inteligência financeira. No topo,
@@ -170,6 +172,38 @@ function IrpfTimeline({ items, fields, onOpenImage }: { items: Record<string, un
   );
 }
 
+// ─── Score de crédito (medidores) ────────────────────────────────────────────
+function ScorePanel({ score, renda, onOpenImage }: { score: unknown; renda: unknown; onOpenImage: (u: string) => void }) {
+  const scores = readScores(score);
+  const consumed = scoreConsumedKeys(score);
+  const rest = Object.entries(score as Record<string, unknown>).filter(([k]) => !consumed.has(k));
+  const rendaValor = (renda as Record<string, unknown> | undefined)?.renda;
+  return (
+    <section className="ef-section">
+      <h3 className="ef-section-title">Score de crédito<span className="ef-count">{scores.length}</span></h3>
+      <div className="fin-scores">
+        {scores.map((s) => (
+          <div className="fin-score" key={s.key}>
+            <ScoreGauge value={s.value} label={s.key.toUpperCase()} band={bandLabel(s.band)} size={190} dark={false} />
+          </div>
+        ))}
+        {typeof rendaValor === 'number' && (
+          <div className="fin-score renda">
+            <small>Renda estimada</small>
+            <b>{formatCurrency(rendaValor)}</b>
+            <span>mensal</span>
+          </div>
+        )}
+      </div>
+      {rest.length > 0 && (
+        <div className="fin-extra">
+          <ProfileCardEntries entries={rest} query="" onOpenImage={onOpenImage} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Cockpit (veredito + sinais) ─────────────────────────────────────────────
 const SKIP_PROP = new Set(['cpf', 'csb8', 'csb8_faixa']);
 function activeProps(v: unknown): number {
@@ -178,6 +212,7 @@ function activeProps(v: unknown): number {
 }
 
 const DOMAINS: { id: string; title: string; sub: string; color: string; sources: string[] }[] = [
+  { id: 'score', title: 'Score & renda', sub: 'Pontuação de crédito e demais indicadores financeiros', color: '#0ea5e9', sources: ['score', 'financeiro'] },
   { id: 'bancario', title: 'Bancos & Fisco', sub: 'Contas bancárias, chaves PIX e restituições de IRPF', color: '#2563eb', sources: ['contasBancos', 'chavesPix', 'irpf'] },
   { id: 'risco', title: 'Crédito & risco', sub: 'Cheques sem fundo, dívida ativa e empréstimos', color: '#dc2626', sources: ['ccf', 'dividaAtiva', 'emprestimos'] },
   { id: 'consumo', title: 'Assinaturas & serviços', sub: 'Assinaturas, compras, telecom e energia', color: '#7c3aed', sources: ['assinaturas', 'comprasOnline', 'planos', 'planosMoveis', 'energias'] },
@@ -225,6 +260,7 @@ export function FinancePage({
   const renderSection = (spec: SectionSpec): ReactNode => {
     if (spec.source === 'contasBancos') return <BankAccounts items={arr(sr.contasBancos)} fields={spec.fields ?? []} onOpenImage={onOpenImage} />;
     if (spec.source === 'irpf') return <IrpfTimeline items={arr(sr.irpf)} fields={spec.fields ?? []} onOpenImage={onOpenImage} />;
+    if (spec.source === 'score' && readScores(sr.score).length > 0) return <ScorePanel score={sr.score} renda={sr.cadastral} onOpenImage={onOpenImage} />;
     return <ProfileSectionView spec={spec} serviceResponse={sr} query="" onOpenImage={onOpenImage} onConsult={onConsult} />;
   };
 

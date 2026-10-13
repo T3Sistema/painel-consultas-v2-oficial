@@ -3,7 +3,7 @@ import { useGraphStore } from '../../store/graphStore';
 import { usePersonProfileStore } from '../../store/personProfileStore';
 import { formatCNPJ, formatCPF, formatCurrency, formatDate, normalizeText } from '../../lib/format';
 import { PROFILE_PAGES, PROFILE_PAGE_NAMES, UNMAPPED_PAGE_NAME, unmappedGenericSections, type SectionSpec } from '../../lib/profileSchema';
-import { RELATION_LABELS } from '../../lib/colors';
+import { RELATION_LABELS, isContextLink, linkLabel } from '../../lib/colors';
 import { CompanyIcon, PersonIcon } from '../flow/icons';
 import { ImageLightbox } from './ImageLightbox';
 import { valueMatchesQuery } from './ProfileValue';
@@ -16,6 +16,9 @@ import { CareerPage } from './CareerPage';
 import { CyberPage } from './CyberPage';
 import { PatrimonioPage } from './PatrimonioPage';
 import { PresencePage } from './PresencePage';
+import { JuridicoPage } from './JuridicoPage';
+import { PersonDossier } from './PersonDossier';
+import { ContextLinks, ExpandOnMap } from './ContextLinks';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -77,7 +80,9 @@ function Connections({ related, onGo }: { related: { link: GraphLink; other: Gra
               {link.meta.dataEntrada ? ` · desde ${formatDate(link.meta.dataEntrada)}` : ''}
             </small>
           </span>
-          <span className="ef-connection-tag">{link.meta.funcao ?? RELATION_LABELS[link.type]}</span>
+          <span className="ef-connection-tag">
+            {isContextLink(link) ? linkLabel(link) : link.meta.funcao ?? RELATION_LABELS[link.type]}
+          </span>
         </button>
       ))}
     </div>
@@ -92,8 +97,10 @@ function CompanyDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => 
   if (!c) return null;
 
   const statusClass = c.situacao === 'ATIVA' ? 'ok' : c.situacao === 'BAIXADA' ? 'bad' : 'off';
-  const relatedPeople = related.filter((r) => r.other.kind === 'person');
-  const relatedCompanies = related.filter((r) => r.other.kind === 'company');
+  // vínculos de contexto (processo/família) aparecem em "Por que está no mapa", não como sócios
+  const societario = related.filter((r) => !isContextLink(r.link));
+  const relatedPeople = societario.filter((r) => r.other.kind === 'person');
+  const relatedCompanies = societario.filter((r) => r.other.kind === 'company');
 
   return (
     <div className="ef-body">
@@ -107,12 +114,15 @@ function CompanyDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => 
             <span className={`ef-status ${statusClass}`}>{c.situacao ?? 'DESCONHECIDA'}</span>
           </h1>
           <div className="ef-hero-badges">
-            <span className="ef-badge mono">{formatCNPJ(c.cnpj)}</span>
+            {c.cnpj && <span className="ef-badge mono">{formatCNPJ(c.cnpj)}</span>}
             {c.nomeFantasia && <span className="ef-hero-sub">{c.nomeFantasia}</span>}
             <span className="ef-hero-sub">Camada {node.depth} na rede</span>
           </div>
         </div>
       </div>
+
+      <ContextLinks node={node} related={related} onGo={onGo} />
+      <ExpandOnMap node={node} />
 
       <section className="ef-section">
         <h3 className="ef-section-title">Informações gerais</h3>
@@ -284,6 +294,21 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
           </label>
         </div>
 
+        <ContextLinks node={node} related={related} onGo={onGo} />
+        <ExpandOnMap node={node} />
+
+        {!loading && !error && profile && !query && activePage === 0 && (
+          <PersonDossier
+            serviceResponse={sr}
+            cpf={digits}
+            selfName={node.label}
+            onOpenPage={(name) => {
+              const i = PROFILE_PAGE_NAMES.indexOf(name);
+              if (i >= 0) setActivePage(i);
+            }}
+          />
+        )}
+
         {loading && <p className="ef-status-msg">Carregando perfil…</p>}
         {!loading && error && (
           <p className="ef-status-msg ef-status-error">
@@ -352,6 +377,16 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                 sections={activeSections}
                 serviceResponse={sr}
                 onOpenImage={setLightboxSrc}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Jurídico' ? (
+              <JuridicoPage
+                sections={activeSections}
+                serviceResponse={sr}
+                cpf={digits}
+                selfName={node.label}
+                onGo={onGo}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
               />
             ) : PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' ? (
               <CareerPage

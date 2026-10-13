@@ -3,12 +3,13 @@ import { PROFILE_PAGE_NAMES, PROFILE_PAGES, collectUsedSources, unmappedGenericS
 import { fmtCtps, fmtDate, fmtMoney, fmtObito, fmtRg, fmtSexo, getPath, isEmptyValue } from './profileFormat';
 
 describe('profileSchema', () => {
-  it('define exatamente as 9 páginas na ordem pedida', () => {
+  it('define exatamente as 10 páginas na ordem pedida', () => {
     expect(PROFILE_PAGE_NAMES).toEqual([
       'Cadastral & Civil',
       'Contatos & Endereços',
       'Financeiro & Consumo',
       'Carreira & Negócios',
+      'Jurídico',
       'Cyber Sec & Vazamentos',
       'Presença & Viagens',
       'Bens & Patrimônio',
@@ -27,7 +28,8 @@ describe('profileSchema', () => {
     expect(sourcesByPage['Carreira & Negócios']).toEqual(expect.arrayContaining(['sociedades', 'empregos', 'rais', 'politica']));
     expect(sourcesByPage['Cyber Sec & Vazamentos']).toEqual(expect.arrayContaining(['credenciaisVazadas', 'vazamentos']));
     expect(sourcesByPage['Bens & Patrimônio']).toEqual(expect.arrayContaining(['placas', 'aeronaves']));
-    expect(sourcesByPage['Saúde']).toEqual(expect.arrayContaining(['vacinas', 'processos']));
+    expect(sourcesByPage['Saúde']).toEqual(expect.arrayContaining(['vacinas']));
+    expect(sourcesByPage['Jurídico']).toEqual(expect.arrayContaining(['processos', 'pecasBnmp', 'juridico']));
     expect(sourcesByPage['Timeline']).toEqual(['linhaDoTempo']);
   });
 

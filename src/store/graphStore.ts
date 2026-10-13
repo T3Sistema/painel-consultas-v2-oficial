@@ -30,6 +30,7 @@ import {
 import { usePersonProfileStore } from './personProfileStore';
 import { extractPersonPhotoUrl } from '../lib/personPhoto';
 import { stripHardFields } from '../lib/mask';
+import { buildCounterparties, extractFamily, extractProcessos, vinculoLabel } from '../lib/judicial';
 
 export type ProviderMode = 'cadastral';
 
@@ -54,6 +55,9 @@ export const companyId = (cnpj: string) => `c:${onlyDigits(cnpj).padStart(14, '0
 export const personId = (cpfOrName: string) => `p:${cpfOrName.trim()}`;
 
 const linkId = (source: string, target: string, type: RelationType) => `${source}→${target}:${type}`;
+
+/** Teto de contrapartes judiciais desenhadas por pessoa (as demais seguem na aba "Jurídico"). */
+const MAX_COUNTERPARTIES_PER_PERSON = 40;
 
 /** Limite de segurança para o "Expandir Tudo" não explodir a renderização */
 const EXPAND_ALL_NODE_CAP = 600;
@@ -167,6 +171,9 @@ const RELATION_ORDER: RelationType[] = [
   'FILIAL',
   'MATRIZ',
   'PARTICIPACAO',
+  'PARENTE',
+  'PROCESSO',
+  'COPARTE',
 ];
 
 function sortRelations(list: RelationType[]): RelationType[] {
@@ -193,6 +200,10 @@ const PRIMARY_RELATION_PRIORITY: RelationType[] = [
   'CONTROLADA',
   'MATRIZ',
   'FILIAL',
+  // rede de contexto: nunca vence uma relação societária
+  'PARENTE',
+  'PROCESSO',
+  'COPARTE',
 ];
 
 /**
@@ -321,6 +332,7 @@ function mergeCompanyResult(
     nodeIndex.set(cId, cNode);
   } else {
     cNode.depth = Math.min(cNode.depth, depth);
+    delete cNode.context;
   }
   cNode.company = result.company;
   cNode.label = result.company.razaoSocial;
@@ -348,6 +360,7 @@ function mergeCompanyResult(
         nodeIndex.set(pId, pNode);
       } else {
         pNode.depth = Math.min(pNode.depth, partnerDepth);
+        delete pNode.context;
         if (p.person.administrador) pNode.person = { ...pNode.person!, administrador: true };
       }
       addOrMergeLink(links, pId, cId, p.relation, p.meta);
@@ -375,6 +388,7 @@ function mergeCompanyResult(
         nodeIndex.set(pjId, pjNode);
       } else {
         pjNode.depth = Math.min(pjNode.depth, partnerDepth);
+        delete pjNode.context;
       }
       addOrMergeLink(links, pjId, cId, p.relation, p.meta);
     }
@@ -427,6 +441,7 @@ function mergeApiFullSociedadeRelation(state: GraphState, personNode: GraphNode,
     nodeIndex.set(cId, cNode);
   } else {
     cNode.depth = Math.min(cNode.depth, depth);
+    delete cNode.context;
   }
 
   const relation = mapRelation(s.qualificacaoSocioDescricao ?? '');
@@ -438,6 +453,106 @@ function mergeApiFullSociedadeRelation(state: GraphState, personNode: GraphNode,
   });
 
   return { nodes: [...nodeIndex.values()], links };
+}
+
+/** Aresta já existente entre o par, em qualquer sentido — a rede de contexto é simétrica. */
+function existingDirection(links: GraphLink[], a: string, b: string): [string, string] {
+  const reversed = links.some((l) => {
+    const s = typeof l.source === 'string' ? l.source : l.source.id;
+    const t = typeof l.target === 'string' ? l.target : l.target.id;
+    return s === b && t === a;
+  });
+  return reversed ? [b, a] : [a, b];
+}
+
+/**
+ * Desenha a rede de CONTEXTO de uma pessoa a partir do próprio perfil:
+ * demais partes dos processos judiciais (contraparte ou co-parte) e
+ * parentes. Não faz consulta nenhuma — só lê o perfil já carregado. Os nós
+ * novos ficam marcados com `context` (fora das cascatas automáticas, ver
+ * `GraphNode.context`); nó já existente no grafo ganha só a aresta.
+ * Cada processo vira uma evidência própria na aresta (origem = nº do
+ * processo), então a contagem por aresta sai direto de `meta.evidencias`.
+ */
+function mergePersonNetwork(state: GraphState, personNode: GraphNode, profile: ApiFullProfile, depth: number) {
+  const { nodeIndex } = state;
+  const links = [...state.links];
+  const sr = profile.SERVICE_RESPONSE;
+  const cpf = onlyDigits(personNode.person?.cpf ?? '');
+  const counterparties = buildCounterparties(extractProcessos(sr), cpf, personNode.label);
+  const family = extractFamily(sr, counterparties);
+  let added = 0;
+
+  const ensure = (
+    id: string,
+    make: () => GraphNode,
+    context: NonNullable<GraphNode['context']>,
+  ): GraphNode | undefined => {
+    if (id === personNode.id) return undefined;
+    let node = nodeIndex.get(id);
+    if (!node) {
+      node = { ...make(), context };
+      nodeIndex.set(id, node);
+      added += 1;
+    } else {
+      node.depth = Math.min(node.depth, depth);
+    }
+    return node;
+  };
+
+  const personNodeFor = (doc: string | undefined, nome: string, context: 'processo' | 'familia') =>
+    ensure(
+      personId(doc ?? nome),
+      () => ({
+        id: personId(doc ?? nome),
+        kind: 'person',
+        label: nome,
+        depth,
+        // sem CPF válido não há o que consultar — nasce "expandido" (sem o "+")
+        expanded: !doc,
+        person: { cpf: doc ?? '', nome },
+      }),
+      context,
+    );
+
+  for (const f of family) {
+    const node = personNodeFor(f.documento, f.nome, 'familia');
+    if (!node) continue;
+    const [s, t] = existingDirection(links, personNode.id, node.id);
+    addOrMergeLink(links, s, t, 'PARENTE', { funcao: vinculoLabel(f.vinculo), origem: 'Vínculo familiar' });
+  }
+
+  for (const cp of counterparties.slice(0, MAX_COUNTERPARTIES_PER_PERSON)) {
+    let node: GraphNode | undefined;
+    if (cp.pessoaJuridica) {
+      const id = cp.documento ? companyId(cp.documento) : `c:${cp.key}`;
+      node = ensure(
+        id,
+        () => ({
+          id,
+          kind: 'company',
+          label: cp.nome,
+          depth,
+          expanded: !cp.documento,
+          company: { cnpj: cp.documento ?? '', razaoSocial: cp.nome, situacao: 'DESCONHECIDA' },
+        }),
+        'processo',
+      );
+    } else {
+      node = personNodeFor(cp.documento, cp.nome, 'processo');
+    }
+    if (!node) continue;
+    const [s, t] = existingDirection(links, personNode.id, node.id);
+    for (const p of cp.processos) {
+      addOrMergeLink(links, s, t, p.relation === 'coparte' ? 'COPARTE' : 'PROCESSO', {
+        funcao: p.classe,
+        origem: `Processo ${p.numero}`,
+        dataEntrada: p.dataAjuizamento?.slice(0, 10),
+      });
+    }
+  }
+
+  return { patch: { nodes: [...nodeIndex.values()], links }, added };
 }
 
 /**
@@ -526,14 +641,19 @@ async function expandPersonViaProfile(
   }
   if (get().graphEpoch !== epoch) return;
 
+  // Rede de contexto (processos/família) sai do próprio perfil — sem consulta extra.
+  const network = mergePersonNetwork(get(), node, profile, targetDepth);
+  set(network.patch);
+
   const sociedades = extractSociedades(profile);
   if (sociedades.length === 0) {
     node.expanded = true;
-    // Sem a seção de sociedades a camada não tem como crescer — avisa, em vez
-    // de deixar o nó "expandido" e o mapa parado sem explicação nenhuma.
+    // Sem a seção de sociedades a camada não cresce pela via societária — avisa
+    // só quando também não houve rede de contexto, senão o mapa parado ficaria
+    // sem explicação nenhuma.
     set({
       nodes: [...get().nodeIndex.values()],
-      ...(hasSociedadesSection(profile)
+      ...(hasSociedadesSection(profile) || network.added > 0
         ? {}
         : { notice: `${nomeDoNo(node)}: esta consulta não traz participação societária. O perfil completo continua disponível no painel.` }),
     });
@@ -763,6 +883,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       nodeIndex.set(rootId, rootNode);
       set({ nodes: [...nodeIndex.values()], nodeIndex });
 
+      // Partes dos processos e parentes entram já na Camada 1, direto do perfil.
+      const network = mergePersonNetwork(get(), rootNode, profile, 1);
+      set(network.patch);
+
       if (sociedades.length === 0) {
         set({
           rootId,
@@ -774,7 +898,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           unsavedChanges: true,
           ...(hasSociedadesSection(profile)
             ? {}
-            : { notice: `${nome}: esta consulta não traz participação societária, então o mapa fica só com a pessoa. O perfil completo está no painel.` }),
+            : network.added > 0
+              ? { notice: `${nome}: esta consulta não traz participação societária — o mapa mostra os vínculos judiciais e familiares.` }
+              : { notice: `${nome}: esta consulta não traz participação societária, então o mapa fica só com a pessoa. O perfil completo está no painel.` }),
         });
         return;
       }
@@ -910,7 +1036,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   expandAll: async () => {
     const { maxDepth, graphEpoch, nodeIndex } = get();
     const pendingPeopleCount = [...nodeIndex.values()].filter(
-      (n) => n.kind === 'person' && !n.expanded && n.depth < maxDepth,
+      (n) => n.kind === 'person' && !n.expanded && !n.context && n.depth < maxDepth,
     ).length;
     if (pendingPeopleCount > 0) {
       // "Expandir Tudo" pode disparar uma cascata de consultas — confirmação
@@ -938,7 +1064,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         break;
       }
       const pending = [...idx.values()]
-        .filter((n) => !n.expanded && n.depth < maxDepth && !expandingIds.has(n.id))
+        // nós de contexto (processo/família) só expandem por pedido explícito
+        .filter((n) => !n.expanded && !n.context && n.depth < maxDepth && !expandingIds.has(n.id))
         .sort((a, b) => a.depth - b.depth)
         .slice(0, 8);
       if (pending.length === 0) break;
@@ -959,7 +1086,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const all = [...s0.nodeIndex.values()];
     const alreadyLoadedNext = all.some((n) => n.depth === target);
     // fronteira: nós ainda não expandidos dentro das camadas visíveis
-    const frontier = all.filter((n) => !n.expanded && n.depth <= s0.currentLayer);
+    // nós de contexto (processo/família) ficam de fora: cada um seria uma consulta paga não pedida
+    const frontier = all.filter((n) => !n.expanded && !n.context && n.depth <= s0.currentLayer);
     if (!alreadyLoadedNext && frontier.length === 0) {
       set({ notice: 'Última camada alcançada — não há novas conexões nos dados.' });
       return;

@@ -1,4 +1,4 @@
-import type { GraphNode, RelationType } from '../types/graph';
+import { CONTEXT_RELATIONS, JUDICIAL_RELATIONS, type GraphLink, type GraphNode, type RelationType } from '../types/graph';
 
 // ─── Identidade visual dos nós (paleta do painel) ─────────────────────────────────
 export const NODE_COLORS = {
@@ -22,6 +22,9 @@ export const LINK_COLORS: Record<RelationType, string> = {
   FILIAL: '#ff762a', // laranja
   MATRIZ: '#8257e6',
   PARTICIPACAO: '#8257e6', // roxo
+  PROCESSO: '#e5484d', // vermelho — litígio
+  COPARTE: '#64748b', // ardósia — mesmo polo
+  PARENTE: '#d6409f', // magenta — família
 };
 
 export const RELATION_LABELS: Record<RelationType, string> = {
@@ -33,7 +36,52 @@ export const RELATION_LABELS: Record<RelationType, string> = {
   FILIAL: 'Filial',
   MATRIZ: 'Matriz de',
   PARTICIPACAO: 'Participação',
+  PROCESSO: 'Processo judicial',
+  COPARTE: 'Co-parte em processo',
+  PARENTE: 'Parente',
 };
+
+const relationsOf = (l: GraphLink): RelationType[] => (l.meta.relations?.length ? l.meta.relations : [l.type]);
+
+/** Quantos processos distintos sustentam a aresta (cada evidência judicial carrega o nº na origem). */
+export function linkProcessCount(l: GraphLink): number {
+  const ev = l.meta.evidencias ?? [];
+  return new Set(ev.filter((e) => JUDICIAL_RELATIONS.includes(e.relation)).map((e) => e.origem ?? '')).size;
+}
+
+/**
+ * Relação que define a cor da aresta: societária vence (é o que o mapa
+ * investiga); depois família; depois litígio; co-parte por último.
+ */
+export function linkPrimaryType(l: GraphLink): RelationType {
+  const rels = relationsOf(l);
+  const societaria = rels.find((r) => !CONTEXT_RELATIONS.includes(r));
+  if (societaria) return societaria;
+  for (const r of ['PARENTE', 'PROCESSO', 'COPARTE'] as const) if (rels.includes(r)) return r;
+  return l.type;
+}
+
+export const linkColor = (l: GraphLink): string => LINK_COLORS[linkPrimaryType(l)];
+
+/** `true` quando a aresta é só de contexto (processo/família) — sem relação societária. */
+export const isContextLink = (l: GraphLink): boolean => relationsOf(l).every((r) => CONTEXT_RELATIONS.includes(r));
+
+/** Rótulo curto da aresta no mapa ("Sócio", "Mãe · 1 processo", "3 processos"…). */
+export function linkLabel(l: GraphLink): string {
+  const primary = linkPrimaryType(l);
+  if (!CONTEXT_RELATIONS.includes(primary)) return RELATION_LABELS[primary];
+  const parts: string[] = [];
+  if (relationsOf(l).includes('PARENTE')) {
+    const fam = (l.meta.evidencias ?? []).find((e) => e.relation === 'PARENTE');
+    parts.push(fam?.qualificacao ?? RELATION_LABELS.PARENTE);
+  }
+  const n = linkProcessCount(l);
+  if (n > 0) {
+    const onlyCoparte = !relationsOf(l).includes('PROCESSO');
+    parts.push(`${onlyCoparte && parts.length === 0 ? 'Co-parte · ' : ''}${n} processo${n > 1 ? 's' : ''}`);
+  }
+  return parts.join(' · ') || RELATION_LABELS[primary];
+}
 
 export function nodeColor(node: GraphNode): string {
   if (node.kind === 'person') {

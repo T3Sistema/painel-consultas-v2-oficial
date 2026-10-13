@@ -7,7 +7,7 @@ const { requireSessionMock, mirrorImagesInPayloadMock } = vi.hoisted(() => ({
 vi.mock('./_lib/auth', () => ({ requireSession: requireSessionMock }));
 vi.mock('./_lib/imageMirror', () => ({ mirrorImagesInPayload: mirrorImagesInPayloadMock }));
 
-import handler, { normalizeAndValidateCpf } from './consulta-pessoa';
+import handler, { keepOnlySearchedContent, normalizeAndValidateCpf } from './consulta-pessoa';
 
 // Fixture sintética conhecida (não é documento de pessoa real) — usada em
 // tutoriais de validação de CPF, só serve para testar o algoritmo.
@@ -192,5 +192,51 @@ describe('handler (api/consulta-pessoa)', () => {
     const text = await res.text();
     expect(text).not.toContain('cdn.fornecedor.com');
     expect(JSON.parse(text).code).toBe('unexpected_response');
+  });
+
+  it('repassa só o conteúdo pesquisado — carimbos de origem, link de relatório e bases acionadas nunca chegam ao cliente', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'sucesso',
+          'Fornecedor X': 'https://doc.fornecedor.com.br',
+          dados: {
+            cpf: VALID_CPF,
+            pessoa: { identificacao: { nome: 'FULANA DE TAL' } },
+            query_date: '2026-10-10T20:39:35+00:00',
+            fontes_consultadas: { base_interna: true },
+          },
+          aux: { data: 'https://storage.fornecedor.com/relatorio.pdf', type: 'link' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const res = await handler(postRequest({ cpf: VALID_CPF }));
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(text)).toEqual({ status: 'sucesso', dados: { pessoa: { identificacao: { nome: 'FULANA DE TAL' } } } });
+    expect(text).not.toMatch(/fornecedor|fontes_consultadas|query_date|relatorio/i);
+    // o espelhamento recebe o payload já recortado
+    expect(mirrorImagesInPayloadMock.mock.calls[0][0]).not.toHaveProperty('aux');
+  });
+});
+
+describe('keepOnlySearchedContent', () => {
+  it('mantém a forma consolidada intacta', () => {
+    const sr = { cadastral: { nome: 'X' }, sociedades: [] };
+    expect(keepOnlySearchedContent({ status: 'sucesso', dados: { SERVICE_RESPONSE: sr, extra: 1 } })).toEqual({
+      status: 'sucesso',
+      dados: { SERVICE_RESPONSE: sr },
+    });
+  });
+
+  it('resposta sem sucesso ou sem conteúdo reconhecível vira marcador neutro, sem a mensagem de origem', () => {
+    expect(keepOnlySearchedContent({ status: 'erro', mensagem: 'Saldo insuficiente no Fornecedor X' })).toEqual({
+      status: 'sem_resultado',
+    });
+    expect(keepOnlySearchedContent({ status: 'sucesso', dados: { outra: {} } })).toEqual({ status: 'sem_resultado' });
+    expect(keepOnlySearchedContent('texto')).toEqual({ status: 'sem_resultado' });
   });
 });

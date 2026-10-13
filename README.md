@@ -24,7 +24,16 @@ baixadas têm contorno tracejado e filiais usam cinza médio.
 ## Funcionalidades
 
 - **Mapa interativo em React Flow** (@xyflow/react): pan, zoom, arrastar nós (posição
-  preservada), controles, layout radial automático e botão **Reorganizar**.
+  preservada), controles, layout radial automático (anéis crescem com a
+  quantidade de nós) e botão **Reorganizar** (os nós deslizam até o novo layout).
+- **Coreografia do mapa** (`src/lib/motion.ts` + `FlowCanvas`): na abertura a raiz
+  surge com ondas de radar e órbita, a câmera começa colada nela e abre enquanto
+  cada camada explode em varredura horária, cada nó voando do nó-pai até o lugar
+  (com "estouro" e onda de choque). Arestas são desenhadas por um traço luminoso
+  do nó mais antigo ao recém-chegado; o rótulo surge em seguida. Passar o mouse
+  num nó acende a vizinhança (partículas correndo pelas arestas) e recua o resto;
+  expandir mostra varredura de radar no nó e no mapa. Tudo respeita
+  `prefers-reduced-motion` (sem voo, desenho nem partícula).
 - **Controle de camadas** `[ − ] Camada N [ + ]` flutuante sobre o mapa: camadas
   cumulativas (avançar adiciona o próximo nível de relacionamentos mantendo os
   anteriores; voltar oculta apenas os exclusivos das camadas superiores, com cache
@@ -46,7 +55,12 @@ baixadas têm contorno tracejado e filiais usam cinza médio.
   roxo. Tamanho do nó cresce com conexões e capital social. Cada tipo de relacionamento
   tem cor própria e legenda na linha (visível ao aproximar o zoom).
 - **Painel lateral** com dados cadastrais completos (empresa) ou participações (pessoa),
-  histórico societário e navegação para nós relacionados. No nó pessoa, uma seção
+  histórico societário e navegação para nós relacionados. A pessoa abre com um
+  **dossiê** (score em medidor, idade, renda, processos, contatos, CNH, família —
+  cada cartão leva à aba de origem) e tem a aba **Jurídico**: cockpit (volume,
+  valor em causa, polo da pessoa, ajuizamentos por ano), quem aparece contra/junto
+  dela, advogados que a representaram e a lista de processos com filtro por polo,
+  busca, ordenação e partes/representantes (CPF de terceiro mascarado). No nó pessoa, uma seção
   **Perfil completo** (APIFull) traz o restante da resposta em seções recolhíveis
   simples, uma por chave — ver "Fontes de dados" e o aviso de segurança abaixo.
 - **Busca inteligente** por nome, CPF, CNPJ, razão social ou fantasia — destaca,
@@ -82,9 +96,25 @@ ao avançar de camada, cada CPF da fronteira é consultado na APIFull → os
 CNPJs em `sociedades[]` são enriquecidos na FonteData (empresa completa +
 todos os seus sócios) → empresa nova e seus sócios entram juntos na mesma
 camada seguinte à da pessoa → repete a partir das pessoas novas na próxima
-camada. Só `sociedades[]` altera o grafo — o restante do perfil da APIFull
-(documentos, contatos, vazamentos etc.) aparece só no painel lateral da
-pessoa, nunca vira nó/aresta.
+camada. Além de `sociedades[]`, duas partes do perfil viram nós/arestas —
+a **rede de contexto** (abaixo); o restante (documentos, contatos,
+vazamentos etc.) aparece só no detalhe da pessoa, nunca vira nó/aresta.
+
+**Rede de contexto (processos e família).** `src/lib/judicial.ts` lê os
+processos judiciais e os parentes do próprio perfil — sem consulta extra —
+e `mergePersonNetwork` (graphStore) desenha, uma camada abaixo da pessoa:
+cada outra parte dos processos (agregada por CPF/CNPJ, ou nome quando não
+há documento; advogados ficam de fora) e cada parente (CPF zerado/inválido
+herda o documento da mesma pessoa nos processos, pelo nome). Cada processo
+é uma evidência própria na aresta (`PROCESSO` = polos opostos ou
+envolvido; `COPARTE` = mesmo polo; `PARENTE`), então o rótulo sai direto
+dela ("2 processos", "Mãe · 1 processo"). Esses nós levam
+`GraphNode.context` e **ficam fora da cascata automática** de camadas e do
+"Expandir Tudo" — cada um seria uma consulta paga não pedida; expandem só
+por pedido explícito (botão "Expandir no mapa" no detalhe). Ao entrarem na
+rede societária por outro caminho, perdem a marca. Filtros "Vínculos
+judiciais" e "Família" na barra lateral (ausentes em consultas salvas
+antigas = ligados).
 
 **Dois formatos de resposta para a consulta de pessoa.** A APIFull devolve o
 perfil ora consolidado em `dados.SERVICE_RESPONSE` (mapa plano cujas chaves
@@ -105,10 +135,19 @@ formato só. Três regras, cobertas por teste:
 3. **Nada é perdido.** Bloco ou chave desconhecida é repassado com o nome que
    tinha e cai nas seções genéricas do schema.
 
-O formato por blocos **não traz `sociedades[]`**, então o grafo não tem como
-crescer a partir dele. Para não confundir isso com "esta pessoa não tem
-sociedades", `hasSociedadesSection()` distingue os dois casos e o grafo
-exibe um aviso em vez de abrir um mapa vazio sem explicação.
+O formato por blocos **não traz `sociedades[]`**, então o grafo não cresce
+pela via societária a partir dele — mas traz processos e parentes, que
+abrem a rede de contexto acima. Para não confundir isso com "esta pessoa
+não tem sociedades", `hasSociedadesSection()` distingue os dois casos e o
+grafo avisa quando o mapa mostra só os vínculos judiciais/familiares.
+
+**Recorte no servidor.** O corpo de origem da consulta de pessoa traz, ao
+lado de `dados.pessoa`, carimbos com nome/domínio do fornecedor, link de
+relatório hospedado por ele e a lista de bases acionadas.
+`keepOnlySearchedContent` (`api/consulta-pessoa.ts`) repassa ao navegador
+só `{ status, dados: { pessoa | SERVICE_RESPONSE } }` — o resto nunca
+chega nem à aba Network. Resposta sem sucesso vira `{ status:
+"sem_resultado" }`, sem a mensagem de origem.
 
 Clicar numa pessoa carrega o perfil completo (cache/dedup real por CPF em
 `src/store/personProfileStore.ts`, compartilhado com a expansão de camada)

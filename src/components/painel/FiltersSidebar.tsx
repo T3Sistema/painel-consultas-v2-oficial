@@ -207,6 +207,18 @@ export function FiltersSidebar({ open, onToggle }: { open: boolean; onToggle?: (
         checked={filters.showHeadquarters}
         onChange={(v) => setFilters({ showHeadquarters: v })}
       />
+      <FilterRow
+        label="Vínculos judiciais"
+        icon={<span style={{ color: LINK_COLORS.PROCESSO }}>⚖</span>}
+        checked={filters.showJudicial !== false}
+        onChange={(v) => setFilters({ showJudicial: v })}
+      />
+      <FilterRow
+        label="Família"
+        icon={<span style={{ color: LINK_COLORS.PARENTE }}>♥</span>}
+        checked={filters.showFamily !== false}
+        onChange={(v) => setFilters({ showFamily: v })}
+      />
 
       <div className="rule" />
       <div className="label-line">

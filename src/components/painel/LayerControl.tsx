@@ -17,7 +17,8 @@ export function LayerControl() {
   const canAdvance = useMemo(
     () =>
       nodes.some((n) => n.depth === currentLayer + 1) ||
-      nodes.some((n) => !n.expanded && n.depth <= currentLayer),
+      // nós de contexto (processo/família) não entram na cascata — ver GraphNode.context
+      nodes.some((n) => !n.expanded && !n.context && n.depth <= currentLayer),
     [nodes, currentLayer],
   );
 

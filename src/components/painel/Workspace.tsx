@@ -12,6 +12,9 @@ export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTML
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const notice = useGraphStore((s) => s.notice);
+  const layerLoading = useGraphStore((s) => s.layerLoading);
+  const expandingCount = useGraphStore((s) => s.expandingIds.size);
+  const scanning = layerLoading || expandingCount > 0;
   const clearNotice = useGraphStore((s) => s.clearNotice);
 
   const stats = useMemo(() => computeStats(nodes, links), [nodes, links]);
@@ -27,6 +30,14 @@ export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTML
   return (
     <main className="workspace" ref={workspaceRef}>
       <FlowCanvas />
+      {scanning && (
+        <div className="map-scan" aria-hidden="true">
+          <span className="map-scan-pill">
+            <i />
+            Mapeando conexões…
+          </span>
+        </div>
+      )}
       <LayerControl />
       <MapConfig />
 
