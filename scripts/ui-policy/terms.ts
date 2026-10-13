@@ -36,9 +36,10 @@ export const FORBIDDEN_TERMS: ForbiddenTerm[] = [
   // ─── Nome/domínio dos fornecedores de dados usados no backend ───────────
   { id: 'vendor-name-fontedata', pattern: /fontedata/i, reason: 'Nome do fornecedor de dados cadastrais de CNPJ' },
   { id: 'vendor-name-apifull', pattern: /apifull/i, reason: 'Nome do fornecedor de perfil completo de CPF' },
+  { id: 'vendor-name-dabradata', pattern: /dabradata/i, reason: 'Nome do fornecedor atual de dados cadastrais de CNPJ' },
   {
     id: 'vendor-domain',
-    pattern: /\bapp\.fontedata\.com\b|\bfontedata\.com\b|\bapi\.apifull\.com\.br\b|\bapifull\.com\.br\b/i,
+    pattern: /\bapp\.fontedata\.com\b|\bfontedata\.com\b|\bapp\.dabradata\.com\b|\bdabradata\.com\b|\bapi\.apifull\.com\.br\b|\bapifull\.com\.br\b/i,
     reason: 'Domínio de fornecedor externo',
   },
 

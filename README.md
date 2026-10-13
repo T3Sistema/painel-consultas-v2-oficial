@@ -79,19 +79,26 @@ A camada de dados é plugável (`src/services/provider.ts`):
 
 | Provedor | CNPJ → sócios | CPF → perfil + empresas |
 |---|---|---|
-| **FonteData** (rota interna `/api/consulta-empresa`) | ✅ | — |
+| **DabraData** (antes FonteData; rota interna `/api/consulta-empresa`) | ✅ | — |
 | **APIFull** (rota interna `/api/consulta-pessoa`) | — | ✅ (perfil completo + `sociedades[]`) |
 
-Nenhuma chamada é feita direto do navegador para a FonteData/APIFull:
+Nenhuma chamada é feita direto do navegador para a DabraData/APIFull:
 `api/consulta-empresa.ts` e `api/consulta-pessoa.ts` (Vercel Edge Functions)
 atuam como proxy same-origin, repassando as consultas com
-`FONTEDATA_API_KEY` e `APIFULL_AUTHORIZATION` só no servidor, sob rotas com
+`DABRADATA_API_KEY` (com `FONTEDATA_API_KEY` aceita como reserva) e
+`APIFULL_AUTHORIZATION` só no servidor, sob rotas com
 nome de negócio (nunca o nome do fornecedor ou o endpoint real dele). Isso
 evita bloqueio de CORS (as duas são APIs servidor-a-servidor), mantém as
 chaves fora do bundle do cliente e nunca expõe qual fornecedor está por trás
 de cada rota — ver "Neutralidade do frontend" abaixo.
 
-**Pipeline entre camadas:** CNPJ → FonteData → empresa + sócios (Camada 1) →
+A consulta de CNPJ mudou de origem (FonteData → DabraData) sem mudar o
+formato da resposta: mesmo caminho `cadastro-pj-plus?cnpj=`, mesmo header
+`X-API-Key`; só o domínio e a variável de ambiente mudaram. O código do
+cliente (`src/services/fontedata.ts`) continua com o nome antigo — é só um
+nome interno de módulo, nunca chega ao navegador.
+
+**Pipeline entre camadas:** CNPJ → DabraData → empresa + sócios (Camada 1) →
 ao avançar de camada, cada CPF da fronteira é consultado na APIFull → os
 CNPJs em `sociedades[]` são enriquecidos na FonteData (empresa completa +
 todos os seus sócios) → empresa nova e seus sócios entram juntos na mesma
@@ -188,7 +195,7 @@ metadados/envelopes de resposta, nem no bundle compilado. Regra completa em
 - **Fronteira server-only**: `src/services/apifull.ts`/`fontedata.ts`
   chamam só as rotas internas neutras `/api/consulta-pessoa` e
   `/api/consulta-empresa` — nunca o domínio real do fornecedor, nunca com a
-  chave. As credenciais (`FONTEDATA_API_KEY`, `APIFULL_AUTHORIZATION`) só
+  chave. As credenciais (`DABRADATA_API_KEY`, `APIFULL_AUTHORIZATION`) só
   existem em `process.env`, lidas por `api/*.ts` (nunca `VITE_*`, nunca
   importado por `src/`).
 - **Espelhamento de imagens** (`api/_lib/imageMirror.ts`): nenhuma imagem é
@@ -220,7 +227,7 @@ metadados/envelopes de resposta, nem no bundle compilado. Regra completa em
 ## Rodando
 
 ```bash
-cp .env.example .env   # preencha FONTEDATA_API_KEY, APIFULL_AUTHORIZATION, SUPABASE_URL, SUPABASE_SECRET_KEY
+cp .env.example .env   # preencha DABRADATA_API_KEY, APIFULL_AUTHORIZATION, SUPABASE_URL, SUPABASE_SECRET_KEY
 npm install
 npm run dev        # http://localhost:5173 — só a UI; /api/* não é servido (ver abaixo)
 npm run build      # produção em dist/
@@ -269,7 +276,7 @@ api/
 ├── saved-queries/
 │   ├── index.ts            # GET lista / POST cria (snapshot + upload de imagens)
 │   └── [id].ts              # GET abre (signed URLs) / DELETE exclui (+ imagens do bucket)
-├── consulta-empresa.ts     # Vercel Edge Function: proxy same-origin p/ FonteData (protegida por sessão)
+├── consulta-empresa.ts     # Vercel Edge Function: proxy same-origin p/ DabraData — cadastro-pj-plus (protegida por sessão)
 └── consulta-pessoa.ts      # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
 
 supabase/migrations/        # users, sessions, saved_queries, saved_query_images, mirrored_images (RLS sem policies)
