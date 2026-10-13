@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './index.css';
 import './painel.css';
+import './painel-noite.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
