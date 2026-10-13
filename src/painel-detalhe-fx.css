@@ -272,12 +272,6 @@
 .painel .entity-full .fin-score {
   background-image: radial-gradient(130% 100% at 50% 0%, rgba(34, 211, 238, 0.12), transparent 65%);
 }
-.painel .entity-full .fin-score.renda {
-  background-image: radial-gradient(130% 100% at 50% 0%, rgba(52, 211, 153, 0.14), transparent 65%);
-}
-.painel .entity-full .fin-score.renda b {
-  color: #6ee7b7;
-}
 .painel .entity-full .gauge-track {
   stroke: rgba(255, 255, 255, 0.08);
 }

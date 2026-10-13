@@ -4517,28 +4517,6 @@
   border-radius: 16px;
   background: radial-gradient(120% 90% at 50% 0%, #f0f9ff, #fff 60%);
 }
-.fin-score.renda {
-  align-content: center;
-  gap: 6px;
-  background: radial-gradient(120% 90% at 50% 0%, #ecfdf5, #fff 60%);
-}
-.fin-score.renda small {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #64748b;
-}
-.fin-score.renda b {
-  font-size: 30px;
-  font-weight: 850;
-  letter-spacing: -0.03em;
-  color: #065f46;
-}
-.fin-score.renda span {
-  font-size: 12px;
-  color: #64748b;
-}
 
 /* ─── Dossiê (faixa-resumo da pessoa) ─── */
 .dos {

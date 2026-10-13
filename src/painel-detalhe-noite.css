@@ -447,22 +447,6 @@
   background: radial-gradient(120% 90% at 50% 0%, rgba(43, 160, 238, 0.13), #081626 60%);
 }
 
-.entity-full .fin-score.renda {
-  background: radial-gradient(120% 90% at 50% 0%, rgba(47, 233, 146, 0.13), #081626 60%);
-}
-
-.entity-full .fin-score.renda small {
-  color: #9fb6c8;
-}
-
-.entity-full .fin-score.renda b {
-  color: #b2fae6;
-}
-
-.entity-full .fin-score.renda span {
-  color: #9fb6c8;
-}
-
 .entity-full .dos .dos-score {
   background: radial-gradient(130% 100% at 50% 0%, rgba(43, 160, 238, 0.13), #081626 65%);
 }
