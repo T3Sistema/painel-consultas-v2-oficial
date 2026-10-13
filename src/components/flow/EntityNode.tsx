@@ -53,6 +53,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) =
     '--rf-radius': `${data.radius}px`,
     '--rf-size': `${size}px`,
     '--rf-color': data.ring ?? data.color,
+    '--rf-fill': data.color,
     '--enter-delay': `${data.enterDelay ?? 0}ms`,
   } as React.CSSProperties;
 
@@ -92,7 +93,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) =
           {isSelected && <span className="rf-selring" aria-hidden="true" />}
           {data.expanding && <span className="rf-scan" aria-hidden="true" />}
           {data.enterDelay !== undefined && <span className="rf-shock" aria-hidden="true" />}
-          <div className="rf-circle" style={{ background: data.color, borderColor: data.ring ?? data.color }}>
+          <div className="rf-circle">
             {showPhoto ? (
               <img
                 src={data.photoUrl}

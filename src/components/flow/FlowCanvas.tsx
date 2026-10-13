@@ -208,7 +208,7 @@ function FlowCanvasInner() {
           kind: nodeKindClass(n),
           isPerson: n.kind === 'person',
           color: nodeColor(n),
-          ring: isRoot ? '#0d63e8' : matrizAtiva && !isRoot ? NODE_COLORS.matriz : undefined,
+          ring: isRoot ? NODE_COLORS.companyRing : matrizAtiva && !isRoot ? NODE_COLORS.matriz : undefined,
           radius,
           label: n.label,
           subLabel: n.company?.nomeFantasia,
@@ -585,7 +585,7 @@ function FlowCanvasInner() {
         proOptions={{ hideAttribution: true }}
         colorMode={theme}
       >
-        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#d5dde8" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="rgba(56, 220, 255, 0.22)" />
         <Controls showInteractive={false} position="bottom-left" />
       </ReactFlow>
     </div>

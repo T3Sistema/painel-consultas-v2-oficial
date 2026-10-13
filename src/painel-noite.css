@@ -1,0 +1,561 @@
+/* ─── Tema "noite" do painel: mapa e moldura no tom da tela inicial ───
+ * Sobrepõe painel.css só no que é mapa/moldura (topo, filtros, área do grafo,
+ * controles flutuantes, modal de saída). O detalhe em tela cheia
+ * (.entity-full) continua com o próprio visual.
+ */
+.painel {
+  --n-bg: #02060d;
+  --n-panel: #06111e;
+  --n-panel-2: #0a1828;
+  --n-line: rgba(125, 211, 252, 0.13);
+  --n-line-2: rgba(125, 211, 252, 0.24);
+  --n-text: #e6f6fb;
+  --n-muted: #7b93a8;
+  --n-cyan: #22d3ee;
+  --n-ice: #a5f3fc;
+  --n-display: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --n-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* acentos do grafo/legenda na paleta neon (ver src/lib/colors.ts) */
+  --blue: #22d3ee;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --purple: #a78bfa;
+  --orange: #fb923c;
+  --red: #fb7185;
+  background: var(--n-bg);
+}
+
+/* ── topo ── */
+.painel .topbar {
+  position: relative;
+  background: linear-gradient(180deg, rgba(8, 20, 34, 0.96), rgba(4, 12, 22, 0.96));
+  border-bottom: 1px solid var(--n-line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.painel .topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.7), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: noite-scanline 7s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes noite-scanline {
+  0% { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+.painel .brand strong {
+  font-family: var(--n-display);
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.4px;
+  text-shadow: 0 0 18px rgba(34, 211, 238, 0.3);
+}
+.painel .brand span {
+  color: var(--n-muted);
+}
+.painel .search {
+  background: rgba(2, 8, 16, 0.7);
+  border-color: var(--n-line-2);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.painel .search:focus-within {
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12), 0 0 22px rgba(34, 211, 238, 0.18);
+}
+.painel .search svg {
+  color: var(--n-cyan);
+}
+.painel .search input {
+  color: var(--n-text);
+}
+.painel .search input::placeholder {
+  color: #4d667b;
+}
+.painel .search-results,
+.painel .export-menu,
+.painel .cnae-results {
+  background: rgba(6, 16, 28, 0.98);
+  border-color: var(--n-line-2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+}
+.painel .search-results button,
+.painel .export-menu button,
+.painel .cnae-results button {
+  color: var(--n-text);
+  border-color: var(--n-line);
+}
+.painel .search-results button:hover,
+.painel .export-menu button:hover,
+.painel .cnae-results button:hover {
+  background: rgba(34, 211, 238, 0.08);
+}
+.painel .search-results small {
+  color: var(--n-muted);
+}
+.painel .save-query-title-label {
+  color: var(--n-muted);
+}
+.painel .save-query-title-label input {
+  color: var(--n-text);
+  background: rgba(2, 8, 16, 0.7);
+  border-color: var(--n-line-2);
+}
+.painel .btn {
+  color: #cfe3ee;
+  background: rgba(10, 24, 40, 0.7);
+  border-color: var(--n-line);
+  box-shadow: none;
+}
+.painel .btn:hover {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+.painel .btn.plain {
+  background: transparent;
+  color: #b6c9d8;
+}
+.painel .btn.plain:hover {
+  color: #fff;
+  background: rgba(34, 211, 238, 0.08);
+}
+.painel .btn.plain:hover .icon {
+  color: var(--n-cyan);
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.6));
+}
+.painel .btn.primary {
+  color: #031018;
+  background: linear-gradient(135deg, #a5f3fc, #22d3ee 50%, #06b6d4);
+  border-color: transparent;
+}
+.painel .btn-back-danger {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(251, 113, 133, 0.45);
+  color: #fecdd3;
+}
+.painel .btn-back-danger:hover {
+  background: #f43f5e;
+  border-color: #f43f5e;
+  color: #fff;
+  box-shadow: 0 0 22px rgba(244, 63, 94, 0.4);
+}
+.painel .avatar {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: transparent;
+  box-shadow: 0 0 0 1px var(--n-line-2);
+  color: var(--n-ice);
+}
+.painel .user-name {
+  color: var(--n-text);
+}
+
+/* ── barra de filtros ── */
+.painel .filters {
+  color: var(--n-text);
+  background: linear-gradient(180deg, #050f1b, #030a14);
+  border-right: 1px solid var(--n-line);
+}
+.painel .section-title b,
+.painel .label-line,
+.painel .label-line b {
+  color: var(--n-text);
+}
+.painel .label-line span {
+  color: var(--n-muted);
+}
+.painel .filters-collapse,
+.painel .filters-rail-btn {
+  color: var(--n-ice);
+  background: rgba(34, 211, 238, 0.06);
+  border-color: var(--n-line-2);
+}
+.painel .filters-rail {
+  background: #030a14;
+  color: var(--n-muted);
+}
+.painel .filters-rail-label {
+  color: var(--n-muted);
+}
+.painel .filter-row {
+  color: #c7d8e4;
+  border-radius: 8px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  transition: background 0.15s;
+}
+.painel .filter-row:hover {
+  background: rgba(34, 211, 238, 0.05);
+}
+.painel .switch {
+  background: #1b2b3d;
+  box-shadow: inset 0 0 0 1px var(--n-line);
+}
+.painel .switch:after {
+  background: #7b93a8;
+  box-shadow: none;
+}
+.painel .filter-row input:checked ~ .switch {
+  background: linear-gradient(90deg, #0891b2, #22d3ee);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.45);
+}
+.painel .filter-row input:checked ~ .switch:after {
+  background: #fff;
+}
+.painel .rule {
+  background: var(--n-line);
+}
+.painel .filters select,
+.painel .filters input[type='date'],
+.painel .cnae-search input {
+  color: var(--n-text);
+  background: rgba(2, 8, 16, 0.7);
+  border-color: var(--n-line-2);
+  color-scheme: dark;
+}
+.painel .legend {
+  color: #9fb6c8;
+}
+.painel .legend i {
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* ── área do mapa ── */
+.painel .workspace {
+  background:
+    radial-gradient(90% 70% at 50% 45%, rgba(8, 40, 64, 0.55), transparent 70%),
+    radial-gradient(60% 50% at 85% 10%, rgba(99, 102, 241, 0.1), transparent 70%),
+    var(--n-bg);
+}
+.painel .workspace::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+.painel #reactflow-root .react-flow {
+  background: transparent;
+}
+.painel .level {
+  color: var(--n-ice);
+  background: rgba(6, 16, 28, 0.75);
+  border-color: var(--n-line-2);
+  font-family: var(--n-mono);
+  backdrop-filter: blur(8px);
+}
+.painel .layer-control {
+  background: rgba(6, 16, 28, 0.82);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 26px rgba(34, 211, 238, 0.18);
+  backdrop-filter: blur(10px);
+}
+.painel .layer-control button {
+  color: var(--n-ice);
+}
+.painel .layer-control button:hover:not(:disabled) {
+  color: #031018;
+  background: var(--n-cyan);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.6);
+}
+.painel .layer-control .layer-label {
+  font-family: var(--n-display);
+  letter-spacing: 0.02em;
+  color: #fff;
+  border-inline-color: var(--n-line-2);
+}
+.painel .layer-spinner {
+  border-color: var(--n-cyan);
+  border-top-color: transparent;
+}
+.painel .map-config-btn,
+.painel .map-config-panel {
+  color: #cfe3ee;
+  background: rgba(6, 16, 28, 0.85);
+  border-color: var(--n-line-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+.painel .map-config-btn:hover {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.45);
+}
+.painel .map-config-head,
+.painel .force-label b {
+  color: #fff;
+}
+.painel .force-label,
+.painel .map-config-section,
+.painel .map-config-close {
+  color: var(--n-muted);
+}
+.painel .map-config-close:hover {
+  color: #fff;
+}
+.painel .force-row input[type='range'] {
+  accent-color: var(--n-cyan);
+}
+.painel .map-config-reset {
+  color: #cfe3ee;
+  background: transparent;
+  border-color: var(--n-line-2);
+}
+.painel .map-config-reset:hover {
+  background: rgba(34, 211, 238, 0.08);
+}
+.painel .map-config-animate {
+  color: #031018;
+  background: var(--n-cyan);
+  border-color: var(--n-cyan);
+}
+.painel .map-config-animate:hover {
+  background: #67e8f9;
+}
+.painel .toast {
+  color: var(--n-text);
+  background: rgba(6, 16, 28, 0.92);
+  border: 1px solid var(--n-line-2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(34, 211, 238, 0.12);
+  backdrop-filter: blur(10px);
+}
+.painel #reactflow-root .react-flow__controls {
+  border-color: var(--n-line-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.painel #reactflow-root .react-flow__controls-button {
+  color: var(--n-ice);
+  background: rgba(6, 16, 28, 0.9);
+  border-right-color: var(--n-line);
+}
+.painel #reactflow-root .react-flow__controls-button svg {
+  fill: currentColor;
+}
+.painel #reactflow-root .react-flow__controls-button:hover {
+  color: #031018;
+  background: var(--n-cyan);
+}
+.painel .map-scan::before {
+  background: conic-gradient(from 0deg, transparent 0 80%, rgba(34, 211, 238, 0.05) 92%, rgba(34, 211, 238, 0.16) 100%);
+}
+.painel .map-scan::after {
+  background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.08), transparent);
+}
+.painel .map-scan-pill {
+  color: var(--n-text);
+  background: rgba(6, 16, 28, 0.9);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+.painel .map-scan-pill i {
+  background: var(--n-cyan);
+}
+
+/* ── nós: disco escuro com núcleo na cor do tipo, aro neon e brilho ── */
+.painel .rf-entity {
+  color: var(--n-text);
+}
+.painel .rf-circle {
+  color: color-mix(in srgb, var(--rf-fill) 55%, #ffffff);
+  border: 2px solid var(--rf-color);
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--rf-fill) 42%, transparent), transparent 62%),
+    radial-gradient(circle at 50% 50%, #0b1a2c, #040b15 72%);
+  box-shadow:
+    0 0 0 3px rgba(2, 6, 13, 0.9),
+    0 0 18px color-mix(in srgb, var(--rf-color) 45%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--rf-fill) 30%, transparent);
+}
+.painel .rf-circle svg {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--rf-fill) 80%, transparent));
+}
+.painel .rf-entity:hover .rf-circle {
+  box-shadow:
+    0 0 0 3px rgba(2, 6, 13, 0.9),
+    0 0 30px color-mix(in srgb, var(--rf-color) 70%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--rf-fill) 45%, transparent);
+}
+.painel .rf-entity.is-selected .rf-circle {
+  box-shadow:
+    0 0 0 3px rgba(2, 6, 13, 0.9),
+    0 0 0 6px color-mix(in srgb, var(--rf-color) 35%, transparent),
+    0 0 36px color-mix(in srgb, var(--rf-color) 70%, transparent);
+}
+.painel .rf-entity.is-focused .rf-circle {
+  box-shadow:
+    0 0 0 3px rgba(2, 6, 13, 0.9),
+    0 0 0 6px color-mix(in srgb, var(--rf-color) 25%, transparent),
+    0 0 30px color-mix(in srgb, var(--rf-color) 60%, transparent);
+}
+.painel .rf-entity.is-root .rf-circle {
+  border-width: 3px;
+  box-shadow:
+    0 0 0 4px rgba(2, 6, 13, 0.9),
+    0 0 40px color-mix(in srgb, var(--rf-fill) 60%, transparent),
+    0 0 90px color-mix(in srgb, var(--rf-fill) 25%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--rf-fill) 45%, transparent);
+}
+.painel .rf-entity.is-dimmed {
+  opacity: 0.14;
+  filter: grayscale(0.8);
+}
+.painel .rf-entity.is-born .rf-circle {
+  animation-name: noite-flash;
+}
+@keyframes noite-flash {
+  0% {
+    box-shadow: 0 0 0 3px rgba(2, 6, 13, 0.9), 0 0 50px 16px color-mix(in srgb, var(--rf-color) 75%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(2, 6, 13, 0.9), 0 0 18px color-mix(in srgb, var(--rf-color) 45%, transparent);
+  }
+}
+.painel .rf-label {
+  background: rgba(5, 14, 26, 0.86);
+  border: 1px solid var(--n-line-2);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+.painel .rf-label strong {
+  color: #f1fbff;
+}
+.painel .rf-label span {
+  color: #9fb6c8;
+}
+.painel .rf-label small {
+  color: #6b8aa3;
+  font-family: var(--n-mono);
+  letter-spacing: 0.02em;
+}
+.painel .rf-label em {
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.45);
+}
+.painel .rf-label.main {
+  border-color: rgba(165, 243, 252, 0.55);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12), 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 26px rgba(34, 211, 238, 0.2);
+}
+.painel .rf-label.main strong {
+  font-family: var(--n-display);
+  letter-spacing: 0.01em;
+}
+.painel .rf-expand {
+  color: var(--n-ice);
+  background: #071423;
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.35);
+}
+.painel .rf-loading {
+  background: #071423;
+  border-color: #fbbf24;
+  border-top-color: transparent;
+}
+.painel .rf-ctx {
+  background: #071423;
+  box-shadow: 0 0 10px currentColor;
+}
+.painel .rf-ctx.processo {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.6);
+}
+.painel .rf-ctx.familia {
+  color: #f472b6;
+  border-color: rgba(244, 114, 182, 0.6);
+}
+.painel .rf-orbit {
+  border-color: color-mix(in srgb, var(--rf-color) 55%, transparent);
+}
+
+/* ── arestas ── */
+.painel #reactflow-root .react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--n-ice) !important;
+}
+.painel .rf-edge .rf-edge-base {
+  stroke-opacity: 0.8;
+}
+.painel .rf-edge.is-context .rf-edge-base {
+  stroke-opacity: 0.6;
+}
+.painel .rf-edge.is-active .rf-edge-base {
+  stroke-opacity: 1;
+  filter: drop-shadow(0 0 4px var(--edge-color));
+}
+.painel .rf-edge-glow {
+  opacity: 0.32;
+}
+.painel .rf-edge-label {
+  background: rgba(4, 12, 24, 0.9);
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  filter: none;
+}
+.painel .rf-edge-label.is-context {
+  background: rgba(4, 12, 24, 0.9);
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+.painel .rf-edge-label.is-active {
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent), 0 0 18px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+/* ── modal de saída ── */
+.painel .leave-modal-overlay {
+  background: rgba(2, 6, 13, 0.7);
+  backdrop-filter: blur(6px);
+}
+.painel .leave-modal-card {
+  color: var(--n-text);
+  background: linear-gradient(180deg, #0a1828, #06111e);
+  border: 1px solid var(--n-line-2);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 40px rgba(34, 211, 238, 0.1);
+}
+.painel .leave-modal-card h2 {
+  color: #fff;
+}
+.painel .leave-modal-card p {
+  color: #9fb6c8;
+}
+.painel .leave-modal-danger {
+  background: transparent;
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.5);
+}
+.painel .leave-modal-primary {
+  color: #031018;
+  background: var(--n-cyan);
+  border-color: var(--n-cyan);
+}
+
+/* ── entrada do painel: a moldura desliza, o mapa acende ── */
+.painel .topbar {
+  animation: noite-drop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.painel .filters {
+  animation: noite-slide 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) 0.1s both;
+}
+.painel .workspace {
+  animation: noite-power 0.9s ease-out both;
+}
+@keyframes noite-drop {
+  from { transform: translateY(-100%); opacity: 0; }
+}
+@keyframes noite-slide {
+  from { transform: translateX(-24px); opacity: 0; }
+}
+@keyframes noite-power {
+  0% { opacity: 0; filter: brightness(2); }
+  40% { opacity: 1; }
+  100% { opacity: 1; filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .painel .topbar,
+  .painel .filters,
+  .painel .workspace,
+  .painel .topbar::after {
+    animation: none !important;
+  }
+}

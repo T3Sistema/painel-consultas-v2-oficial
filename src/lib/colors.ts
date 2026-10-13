@@ -1,30 +1,30 @@
 import { CONTEXT_RELATIONS, JUDICIAL_RELATIONS, type GraphLink, type GraphNode, type RelationType } from '../types/graph';
 
-// ─── Identidade visual dos nós (paleta do painel) ─────────────────────────────────
+// ─── Identidade visual dos nós (paleta "noite" — neon sobre fundo escuro, no tom do logo) ───
 export const NODE_COLORS = {
-  company: '#1671f9', // azul — empresa ativa
-  companyRing: '#0d63e8',
-  person: '#18a568', // verde — pessoa
-  inactive: '#a7adb7', // cinza — empresa inativa (suspensa/inapta/nula)
-  baixada: '#f04e57', // vermelho — empresa baixada
-  admin: '#f5a12c', // amarelo — administrador
-  matriz: '#8257e6', // roxo — empresa matriz (destaque)
-  filial: '#ff762a', // laranja — empresa filial
+  company: '#22d3ee', // ciano — empresa ativa
+  companyRing: '#a5f3fc', // gelo — anel da raiz
+  person: '#34d399', // esmeralda — pessoa
+  inactive: '#64748b', // ardósia — empresa inativa (suspensa/inapta/nula)
+  baixada: '#fb7185', // rosa-vermelho — empresa baixada
+  admin: '#fbbf24', // âmbar — administrador
+  matriz: '#a78bfa', // violeta — empresa matriz (destaque)
+  filial: '#fb923c', // laranja — empresa filial
 } as const;
 
 // ─── Cores por tipo de relacionamento ─────────────────────────────────────────
 export const LINK_COLORS: Record<RelationType, string> = {
-  SOCIO: '#1671f9', // azul
-  ADMINISTRADOR: '#18a568', // verde
-  REPRESENTANTE_LEGAL: '#14b8a6', // teal
-  CONTROLADORA: '#f04e57', // vermelho
-  CONTROLADA: '#d63a44',
-  FILIAL: '#ff762a', // laranja
-  MATRIZ: '#8257e6',
-  PARTICIPACAO: '#8257e6', // roxo
-  PROCESSO: '#e5484d', // vermelho — litígio
-  COPARTE: '#64748b', // ardósia — mesmo polo
-  PARENTE: '#d6409f', // magenta — família
+  SOCIO: '#22d3ee', // ciano
+  ADMINISTRADOR: '#34d399', // esmeralda
+  REPRESENTANTE_LEGAL: '#2dd4bf', // turquesa
+  CONTROLADORA: '#fb7185', // rosa-vermelho
+  CONTROLADA: '#f43f5e',
+  FILIAL: '#fb923c', // laranja
+  MATRIZ: '#a78bfa',
+  PARTICIPACAO: '#c084fc', // lilás
+  PROCESSO: '#f87171', // vermelho — litígio
+  COPARTE: '#94a3b8', // ardósia — mesmo polo
+  PARENTE: '#f472b6', // magenta — família
 };
 
 export const RELATION_LABELS: Record<RelationType, string> = {
