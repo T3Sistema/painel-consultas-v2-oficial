@@ -5,6 +5,17 @@ import type { GraphLink, GraphNode } from '../types/graph';
 import { addOrMergeLink, companyId, personId, useGraphStore } from './graphStore';
 import { usePersonProfileStore } from './personProfileStore';
 import { FonteDataProvider } from '../services/fontedata';
+import { linkLabel, linkPrimaryType } from '../lib/colors';
+import { applyFilters } from '../lib/filtering';
+import { defaultFilters } from '../types/graph';
+import {
+  BANCO_CNPJ,
+  COPARTE_CPF,
+  IMOB_CNPJ,
+  MAE_CPF,
+  RESPOSTA_SECOES,
+  SELF_CPF,
+} from '../test/personSectionsFixture';
 
 // Fixtures sintéticas conhecidas (não são documentos/empresas reais).
 const PERSON_CPF = '11144477735';
@@ -979,6 +990,107 @@ describe('buildSnapshot / hydrateFromSnapshot — salvar e reabrir consulta sem 
       'https://supabase.example.com/signed/foto.jpg',
     );
     expect(usePersonProfileStore.getState().profilesByCpf.get(PERSON_CPF)).toEqual(snapshot.profiles[PERSON_CPF]);
+  });
+});
+
+describe('rede de contexto do perfil (processos judiciais e família)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const rootId = personId(SELF_CPF);
+  const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
+  const linkBetween = (a: string, b: string) =>
+    useGraphStore
+      .getState()
+      .links.find((l) => (nid(l.source) === a && nid(l.target) === b) || (nid(l.source) === b && nid(l.target) === a));
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/consulta-pessoa')) return jsonResponse(RESPOSTA_SECOES);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('busca por CPF desenha contrapartes e parentes na Camada 1 — com UMA consulta só', async () => {
+    await useGraphStore.getState().startPersonSearch(SELF_CPF);
+    const s = useGraphStore.getState();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(s.rootId).toBe(rootId);
+    // 4 empresas + co-parte + mãe + terceira sem documento
+    expect(s.nodes).toHaveLength(8);
+    for (const n of s.nodes) if (n.id !== rootId) expect(n.depth).toBe(1);
+
+    expect(s.nodeIndex.get(companyId(IMOB_CNPJ))).toMatchObject({ kind: 'company', context: 'processo', expanded: false });
+    expect(s.nodeIndex.get(personId(COPARTE_CPF))).toMatchObject({ kind: 'person', context: 'processo' });
+    // mãe: CPF zerado no vínculo, documento encontrado nos processos pelo nome
+    expect(s.nodeIndex.get(personId(MAE_CPF))).toMatchObject({ context: 'familia', label: 'HELENA SOUZA TESTE' });
+    // parte sem documento: não há o que consultar, nasce sem o "+"
+    expect(s.nodeIndex.get(personId('JOANA TERCEIRA INTERESSADA'))?.expanded).toBe(true);
+    expect(s.notice).toContain('vínculos judiciais e familiares');
+  });
+
+  it('cada processo vira uma evidência; o rótulo da aresta conta processos e a família vence na cor', async () => {
+    await useGraphStore.getState().startPersonSearch(SELF_CPF);
+
+    const imob = linkBetween(rootId, companyId(IMOB_CNPJ))!;
+    expect(linkLabel(imob)).toBe('2 processos');
+    expect(linkPrimaryType(imob)).toBe('PROCESSO');
+
+    const carlos = linkBetween(rootId, personId(COPARTE_CPF))!;
+    expect(linkLabel(carlos)).toBe('Co-parte · 3 processos');
+
+    const mae = linkBetween(rootId, personId(MAE_CPF))!;
+    expect(linkPrimaryType(mae)).toBe('PARENTE');
+    expect(linkLabel(mae)).toBe('Mãe · 1 processo');
+
+    // nunca duas arestas entre o mesmo par
+    const pairs = useGraphStore.getState().links.map((l) => [nid(l.source), nid(l.target)].sort().join('|'));
+    expect(new Set(pairs).size).toBe(pairs.length);
+  });
+
+  it('nós de contexto ficam fora da cascata de camada — avançar não dispara consulta paga', async () => {
+    await useGraphStore.getState().startPersonSearch(SELF_CPF);
+    fetchMock.mockClear();
+
+    await useGraphStore.getState().nextLayer();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useGraphStore.getState().notice).toContain('Última camada');
+  });
+
+  it('duplo clique (expansão explícita) num nó de contexto consulta e o tira do contexto', async () => {
+    await useGraphStore.getState().startPersonSearch(SELF_CPF);
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes(BANCO_CNPJ)) return fonteDataCompany(BANCO_CNPJ, []);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().expandNode(companyId(BANCO_CNPJ));
+
+    const banco = useGraphStore.getState().nodeIndex.get(companyId(BANCO_CNPJ))!;
+    expect(banco.expanded).toBe(true);
+    expect(banco.context).toBeUndefined();
+  });
+
+  it('filtros de contexto escondem as arestas e os nós que ficam órfãos', async () => {
+    await useGraphStore.getState().startPersonSearch(SELF_CPF);
+    const { nodes, links } = useGraphStore.getState();
+
+    const semJudicial = applyFilters(nodes, links, { ...defaultFilters, showJudicial: false }, rootId);
+    // sobra a raiz e a mãe (que também é co-parte, mas o vínculo familiar segura a aresta)
+    expect(semJudicial.nodes.map((n) => n.id).sort()).toEqual([personId(MAE_CPF), rootId].sort());
+
+    const semNada = applyFilters(nodes, links, { ...defaultFilters, showJudicial: false, showFamily: false }, rootId);
+    expect(semNada.nodes.map((n) => n.id)).toEqual([rootId]);
+
+    // consulta salva antes dos filtros novos (campos ausentes) = tudo ligado
+    const { showJudicial: _a, showFamily: _b, ...antigos } = defaultFilters;
+    expect(applyFilters(nodes, links, antigos, rootId).nodes).toHaveLength(8);
   });
 });
 

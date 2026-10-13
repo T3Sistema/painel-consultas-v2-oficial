@@ -257,6 +257,15 @@ export const PROFILE_PAGES: PageSpec[] = [
     ],
   },
   {
+    name: 'Jurídico',
+    sections: [
+      { title: 'Processos judiciais', source: 'processos', kind: 'generic', alwaysShow: true, emptyText: 'Nenhum processo judicial encontrado.' },
+      { title: 'Peças / mandados (BNMP)', source: 'pecasBnmp', kind: 'generic' },
+      { title: 'Vínculos por processos', source: 'vinculosPorProcessos', kind: 'generic' },
+      { title: 'Outros registros jurídicos', source: 'juridico', kind: 'generic' },
+    ],
+  },
+  {
     name: 'Cyber Sec & Vazamentos',
     sections: [
       { title: 'Credenciais vazadas', source: 'credenciaisVazadas', kind: 'leaks', alwaysShow: true, emptyText: 'Nenhuma credencial vazada encontrada.' },
@@ -296,10 +305,6 @@ export const PROFILE_PAGES: PageSpec[] = [
       { title: 'Benefícios', source: 'beneficios', kind: 'generic' },
       { title: 'Benefícios e auxílios', source: 'beneficiosAuxilios', kind: 'generic' },
       { title: 'Auxílio emergencial', source: 'pagamentosAuxilioEmergencial', kind: 'generic' },
-      { title: 'Processos judiciais', source: 'processos', kind: 'generic', alwaysShow: true, emptyText: 'Nenhum processo judicial encontrado.' },
-      { title: 'Peças / mandados (BNMP)', source: 'pecasBnmp', kind: 'generic' },
-      { title: 'Vínculos por processos', source: 'vinculosPorProcessos', kind: 'generic' },
-      { title: 'Outros registros jurídicos', source: 'juridico', kind: 'generic' },
     ],
   },
   {

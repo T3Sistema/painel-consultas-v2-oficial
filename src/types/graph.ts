@@ -12,7 +12,18 @@ export type RelationType =
   | 'CONTROLADA'
   | 'FILIAL'
   | 'MATRIZ'
-  | 'PARTICIPACAO';
+  | 'PARTICIPACAO'
+  // ─── Rede de contexto do perfil de pessoa (nunca societária) ───
+  /** Partes em polos opostos (ou envolvidas) num processo judicial. */
+  | 'PROCESSO'
+  /** Partes no mesmo polo de um processo (ex.: co-executados). */
+  | 'COPARTE'
+  /** Vínculo familiar declarado no perfil. */
+  | 'PARENTE';
+
+/** Relações que vêm do perfil da pessoa (processos/família), não do quadro societário. */
+export const CONTEXT_RELATIONS: readonly RelationType[] = ['PROCESSO', 'COPARTE', 'PARENTE'];
+export const JUDICIAL_RELATIONS: readonly RelationType[] = ['PROCESSO', 'COPARTE'];
 
 export interface CompanyData {
   cnpj: string;
@@ -53,6 +64,13 @@ export interface GraphNode {
   expanded: boolean;
   company?: CompanyData;
   person?: PersonData;
+  /**
+   * Nó descoberto só pela rede de contexto de uma pessoa (parte de processo
+   * ou parente) — fica de fora das cascatas automáticas de camada/"Expandir
+   * Tudo" (cada uma seria uma consulta paga sem o usuário pedir). Duplo clique
+   * ainda expande, explicitamente. Some quando o nó entra na rede societária.
+   */
+  context?: 'processo' | 'familia';
   // campos gerenciados pelo force-graph
   x?: number;
   y?: number;
@@ -151,6 +169,10 @@ export interface GraphFilters {
   uf: string; // '' = todos
   cnae: string; // '' = todos
   openedAfter: string; // ISO date ou ''
+  /** Vínculos por processo judicial (contrapartes e co-partes). Ausente em consultas antigas = ligado. */
+  showJudicial?: boolean;
+  /** Vínculos familiares. Ausente em consultas antigas = ligado. */
+  showFamily?: boolean;
 }
 
 export const defaultFilters: GraphFilters = {
@@ -166,6 +188,8 @@ export const defaultFilters: GraphFilters = {
   uf: '',
   cnae: '',
   openedAfter: '',
+  showJudicial: true,
+  showFamily: true,
 };
 
 // ─── Eventos para a linha do tempo ────────────────────────────────────────────

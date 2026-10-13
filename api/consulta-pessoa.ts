@@ -47,6 +47,33 @@ export function normalizeAndValidateCpf(rawBody: string): { ok: true; cpf: strin
   return { ok: true, cpf };
 }
 
+type Dict = Record<string, unknown>;
+
+const isDict = (v: unknown): v is Dict => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Recorta a resposta do upstream para SÓ o conteúdo pesquisado, antes de
+ * qualquer outra etapa. O corpo de origem traz, ao lado dos dados da pessoa,
+ * carimbos com nome/domínio do fornecedor, link de relatório hospedado na
+ * infraestrutura dele e a lista de bases acionadas — nada disso pode chegar
+ * ao navegador (ver CLAUDE.md, "Neutralidade do frontend"), nem mesmo na aba
+ * Network. O cliente só lê `status` e `dados.SERVICE_RESPONSE`/`dados.pessoa`
+ * (ver `src/services/apifull.ts`), então é exatamente isso que atravessa.
+ *
+ * Resposta sem sucesso vira um marcador neutro: a mensagem de origem nunca é
+ * repassada (o cliente já mostra um texto próprio para esse caso).
+ */
+export function keepOnlySearchedContent(payload: unknown): Dict {
+  if (!isDict(payload) || payload.status !== 'sucesso' || !isDict(payload.dados)) {
+    return { status: 'sem_resultado' };
+  }
+  const dados: Dict = {};
+  if (isDict(payload.dados.SERVICE_RESPONSE)) dados.SERVICE_RESPONSE = payload.dados.SERVICE_RESPONSE;
+  if (isDict(payload.dados.pessoa)) dados.pessoa = payload.dados.pessoa;
+  if (Object.keys(dados).length === 0) return { status: 'sem_resultado' };
+  return { status: 'sucesso', dados };
+}
+
 /**
  * Proxy same-origin para a APIFull (cpf-ultra): o frontend nunca chama a
  * APIFull diretamente. `link` é sempre fixado aqui — o cliente não escolhe.
@@ -107,9 +134,9 @@ export default async function handler(req: Request): Promise<Response> {
 
   const body = await upstream.text();
 
-  let payload: unknown;
+  let payload: Dict;
   try {
-    payload = JSON.parse(body);
+    payload = keepOnlySearchedContent(JSON.parse(body));
   } catch {
     // Corpo 2xx que não é JSON não pode ser inspecionado em busca de imagens,
     // então também não pode ser repassado — poderia carregar URL de origem.

@@ -60,27 +60,31 @@ export function radialLayout(nodes: GraphNode[], links: GraphLink[], rootId: str
   const present = new Set(nodes.map((n) => n.id));
   const taken: XY[] = [{ x: 0, y: 0 }];
 
+  let prevRadius = 0;
   while (frontier.length > 0 && level < 40) {
-    const next: string[] = [];
+    // 1º junta a camada inteira (para dimensionar o anel), depois posiciona
+    const entries: { child: string; angle: number; step: number }[] = [];
     for (const parent of frontier) {
       const children = (adj.get(parent) ?? []).filter((c) => present.has(c) && !visited.has(c));
       if (children.length === 0) continue;
       const [a0, a1] = sector.get(parent) ?? [0, Math.PI * 2];
-      const span = a1 - a0;
-      const step = span / children.length;
+      const step = (a1 - a0) / children.length;
       children.forEach((child, i) => {
         visited.add(child);
-        const angle = a0 + step * (i + 0.5);
-        const raw = {
-          x: Math.cos(angle) * LEVEL_RADIUS * level,
-          y: Math.sin(angle) * LEVEL_RADIUS * level,
-        };
-        const p = nudge(raw, taken);
-        pos.set(child, p);
-        taken.push(p);
-        sector.set(child, [angle - step / 2, angle + step / 2]);
-        next.push(child);
+        entries.push({ child, angle: a0 + step * (i + 0.5), step });
       });
+    }
+    // anel cresce com a quantidade de nós — evita cartões empilhados num círculo pequeno
+    const radius = Math.max(LEVEL_RADIUS * level, prevRadius + LEVEL_RADIUS, (entries.length * MIN_GAP) / (Math.PI * 2));
+    prevRadius = radius;
+    const next: string[] = [];
+    for (const { child, angle, step } of entries) {
+      const raw = { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+      const p = nudge(raw, taken);
+      pos.set(child, p);
+      taken.push(p);
+      sector.set(child, [angle - step / 2, angle + step / 2]);
+      next.push(child);
     }
     frontier = next;
     level++;
