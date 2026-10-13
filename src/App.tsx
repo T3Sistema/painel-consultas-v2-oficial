@@ -91,12 +91,9 @@ export default function App() {
       );
       if (view === 'saved') {
         return (
-          <div className="flex h-screen flex-col bg-slate-100 dark:bg-slate-950">
-            <div className="flex flex-none items-center justify-end gap-4 px-5 py-3 home-header-light">{header}</div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <SavedQueriesList onBack={() => setView('search')} />
-            </div>
-          </div>
+          <HomeShell header={header}>
+            <SavedQueriesList onBack={() => setView('search')} />
+          </HomeShell>
         );
       }
       return (

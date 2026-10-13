@@ -14,7 +14,7 @@ vi.mock('../services/savedQueries', () => ({
   deleteSavedQuery: deleteSavedQueryMock,
 }));
 
-import { SavedQueriesList } from './SavedQueriesList';
+import { SavedQueriesList, groupOf } from './SavedQueriesList';
 import { useGraphStore } from '../store/graphStore';
 
 describe('SavedQueriesList', () => {
@@ -74,5 +74,20 @@ describe('SavedQueriesList', () => {
 
     expect(deleteSavedQueryMock).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+});
+
+describe('groupOf — agrupamento por dia de calendário', () => {
+  const now = new Date(2026, 9, 13, 9, 0); // 13/10, 9h
+
+  it('ontem à noite não é "Hoje", mesmo com menos de 24h de diferença', () => {
+    expect(groupOf(new Date(2026, 9, 12, 23, 0).toISOString(), now)).toBe('Últimos 7 dias');
+    expect(groupOf(new Date(2026, 9, 13, 0, 5).toISOString(), now)).toBe('Hoje');
+  });
+
+  it('faixas de 7 e 30 dias e data inválida', () => {
+    expect(groupOf(new Date(2026, 9, 1).toISOString(), now)).toBe('Últimos 30 dias');
+    expect(groupOf(new Date(2026, 6, 1).toISOString(), now)).toBe('Mais antigas');
+    expect(groupOf('lixo', now)).toBe('Mais antigas');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { applyMask, type MaskClass } from '../../lib/mask';
 import {
   MAX_RENDER_DEPTH,
@@ -10,6 +10,7 @@ import {
   truncateItems,
 } from '../../lib/profileRender';
 import { normalizeText } from '../../lib/format';
+import { prefersReducedMotion } from '../../lib/motion';
 
 /**
  * Primitivas de renderização de valor do perfil da APIFull, compartilhadas
@@ -146,16 +147,57 @@ function EyeIcon({ open }: { open: boolean }) {
  * nunca mostram o botão — `applyMask` já garante isso independente do
  * estado local.
  */
+const SCRAMBLE_CHARS = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ#$%&@*';
+const SCRAMBLE_FRAMES = 14;
+
 export function MaskedValue({ value, cls }: { value: string; cls: MaskClass }) {
   const [revealed, setRevealed] = useState(false);
+  // durante a revelação, os caracteres "descriptografam" da esquerda para a direita
+  const [scramble, setScramble] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const toggle = () => {
+    const next = !revealed;
+    setRevealed(next);
+    clearTimeout(timer.current);
+    setScramble(null);
+    if (!next || cls !== 'soft' || prefersReducedMotion()) return;
+    const target = applyMask(value, cls, true);
+    let frame = 0;
+    const tick = () => {
+      frame += 1;
+      if (frame >= SCRAMBLE_FRAMES) {
+        setScramble(null);
+        return;
+      }
+      const solved = Math.floor((target.length * frame) / SCRAMBLE_FRAMES);
+      setScramble(
+        Array.from(target, (c, i) =>
+          i < solved || /[\s.\-/@()]/.test(c) ? c : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)],
+        ).join(''),
+      );
+      timer.current = setTimeout(tick, 32);
+    };
+    tick();
+  };
+
   return (
-    <span className="profile-masked">
-      <span>{applyMask(value, cls, revealed)}</span>
+    <span className={`profile-masked ${scramble ? 'is-decrypting' : ''}`}>
+      <span className="pm-text">
+        {/* o valor real entra na hora (leitores de tela, busca, cópia); o embaralhado é só visual */}
+        <span className="pm-real">{applyMask(value, cls, revealed)}</span>
+        {scramble && (
+          <span className="pm-scramble" aria-hidden="true">
+            {scramble}
+          </span>
+        )}
+      </span>
       {cls === 'soft' && (
         <button
           type="button"
           className="profile-reveal"
-          onClick={() => setRevealed((r) => !r)}
+          onClick={toggle}
           aria-label={revealed ? 'Ocultar valor' : 'Revelar valor'}
           title={revealed ? 'Ocultar' : 'Revelar'}
         >

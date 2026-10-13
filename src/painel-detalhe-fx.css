@@ -1,0 +1,411 @@
+/* ─── Detalhe em tela cheia: tema "noite" (ajustes à mão + efeitos) ───
+ * Complementa painel-detalhe-noite.css (gerado): variáveis do tema,
+ * moldura, herói, abas e os efeitos de entrada/rolagem/foco.
+ */
+.painel .entity-full {
+  --ink: #e6f6fb;
+  --muted: #8ea7ba;
+  --line: rgba(125, 211, 252, 0.14);
+  --panel: #081626;
+  --shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  --fx-cyan: #22d3ee;
+  --fx-ice: #a5f3fc;
+  --fx-display: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --fx-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+  background:
+    radial-gradient(70% 50% at 50% -10%, rgba(34, 211, 238, 0.14), transparent 70%),
+    radial-gradient(50% 40% at 100% 30%, rgba(99, 102, 241, 0.1), transparent 70%),
+    radial-gradient(50% 40% at 0% 80%, rgba(14, 165, 233, 0.08), transparent 70%),
+    #030a14;
+}
+
+/* Tons "soft" vêm inline dos componentes (cores pensadas para fundo claro):
+ * no escuro viram um véu translúcido da própria cor do bloco. */
+.painel .entity-full [style*='--c-soft'] {
+  --c-soft: color-mix(in srgb, var(--c) 16%, transparent) !important;
+}
+.painel .entity-full .car-badge {
+  background: color-mix(in srgb, currentColor 16%, transparent) !important;
+}
+.painel .entity-full .car-node {
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06), 0 0 14px currentColor !important;
+}
+
+/* ── moldura: topo e abas ── */
+.painel .entity-full-topbar,
+.painel .entity-full .ef-nav {
+  background: rgba(4, 12, 22, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom-color: var(--line);
+}
+.painel .entity-full-topbar {
+  position: relative;
+}
+.painel .entity-full-topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.75), transparent);
+  background-size: 35% 100%;
+  background-repeat: no-repeat;
+  animation: noite-scanline 6s ease-in-out infinite;
+}
+.painel .entity-full-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--fx-ice);
+  font-family: var(--fx-mono);
+  letter-spacing: 0.16em;
+}
+.painel .entity-full-kind::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fx-cyan);
+  box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7);
+  animation: badge-ping 1.8s ease-out infinite;
+}
+.painel .entity-full-close {
+  color: #cfe3ee;
+  background: rgba(10, 24, 40, 0.7);
+  border-color: rgba(125, 211, 252, 0.24);
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.painel .entity-full-close:hover {
+  color: #fff;
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.25);
+}
+.painel .entity-full-close:hover svg {
+  transform: rotate(90deg);
+}
+.painel .entity-full-close svg {
+  transition: transform 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.painel .entity-full .ef-tab {
+  position: relative;
+  color: #8ea7ba;
+  border-bottom-color: transparent !important;
+  transition: color 0.2s;
+}
+.painel .entity-full .ef-tab:hover:not(:disabled) {
+  color: #fff;
+}
+.painel .entity-full .ef-tab.active {
+  color: #fff;
+  text-shadow: 0 0 14px rgba(34, 211, 238, 0.55);
+}
+.painel .entity-full .ef-tab.active::after {
+  display: none;
+}
+.ef-tab-indicator {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--fx-cyan), transparent);
+  box-shadow: 0 0 12px var(--fx-cyan), 0 -6px 18px rgba(34, 211, 238, 0.35);
+}
+
+/* ── herói ── */
+.painel .entity-full .ef-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(80% 140% at 0% 0%, rgba(34, 211, 238, 0.13), transparent 55%),
+    linear-gradient(180deg, rgba(12, 26, 44, 0.85), rgba(6, 14, 26, 0.85));
+  border-color: rgba(125, 211, 252, 0.2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.painel .entity-full .ef-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(165, 243, 252, 0.07) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: hero-sheen 7s ease-in-out infinite;
+}
+@keyframes hero-sheen {
+  0%, 55% { background-position: 150% 0; }
+  85%, 100% { background-position: -60% 0; }
+}
+.painel .entity-full .ef-hero-avatar {
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 34px color-mix(in srgb, var(--hero-c, #22d3ee) 55%, transparent);
+}
+.painel .entity-full .ef-hero-avatar.person {
+  --hero-c: #34d399;
+  background: radial-gradient(circle at 50% 30%, rgba(52, 211, 153, 0.55), #062a22 75%);
+}
+.painel .entity-full .ef-hero-avatar.company {
+  --hero-c: #22d3ee;
+  background: radial-gradient(circle at 50% 30%, rgba(34, 211, 238, 0.55), #05222c 75%);
+}
+.painel .entity-full .ef-hero-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  padding: 1.5px;
+  background: conic-gradient(from 0deg, transparent 0 60%, var(--hero-c) 85%, #fff 88%, transparent 92%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: spin 4s linear infinite;
+}
+.painel .entity-full .ef-hero-photo {
+  border-radius: 18px;
+}
+.painel .entity-full .ef-hero-name {
+  font-family: var(--fx-display);
+  color: transparent;
+  background: linear-gradient(100deg, #ffffff 0%, #e0fbff 40%, #67e8f9 55%, #ffffff 70%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: title-shine 9s ease-in-out infinite;
+}
+.painel .entity-full .ef-hero-name .ef-status {
+  -webkit-text-fill-color: currentColor;
+}
+.painel .entity-full .ef-badge.mono {
+  font-family: var(--fx-mono);
+  color: var(--fx-ice);
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+.painel .entity-full .ef-search {
+  background: rgba(2, 8, 16, 0.7);
+  border-color: rgba(125, 211, 252, 0.22);
+  color: var(--fx-cyan);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.painel .entity-full .ef-search:focus-within {
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12), 0 0 22px rgba(34, 211, 238, 0.18);
+}
+.painel .entity-full .ef-search input::placeholder {
+  color: #4d667b;
+}
+
+/* ── cartões: vidro escuro, borda acende e holofote segue o mouse ── */
+.painel .entity-full .ef-card,
+.painel .entity-full .dos-tile,
+.painel .entity-full .dos-score,
+.painel .entity-full .jur-cp,
+.painel .entity-full .jur-proc,
+.painel .entity-full .jur-lawyer,
+.painel .entity-full .ct-tile,
+.painel .entity-full .car-tile,
+.painel .entity-full .fin-score,
+.painel .entity-full .ef-connection {
+  background-color: rgba(8, 20, 36, 0.78);
+  border-color: rgba(125, 211, 252, 0.13);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+}
+.painel .entity-full .ef-card {
+  position: relative;
+}
+.painel .entity-full .ef-card:hover {
+  background-image: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(34, 211, 238, 0.13), transparent 60%);
+}
+.painel .entity-full .ef-card:hover,
+.painel .entity-full .jur-cp:hover,
+.painel .entity-full .jur-proc:hover,
+.painel .entity-full .jur-lawyer:hover,
+.painel .entity-full .ef-connection:hover {
+  border-color: rgba(34, 211, 238, 0.38);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), 0 0 22px rgba(34, 211, 238, 0.1);
+}
+.painel .entity-full .ef-card-label {
+  color: #6b8aa3;
+}
+.painel .entity-full .ef-card-value {
+  color: #f1fbff;
+}
+.painel .entity-full .ef-section-title {
+  color: #cfe3ee;
+  border-bottom-color: var(--line);
+}
+.painel .entity-full .ef-section-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #67e8f9, #0891b2);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}
+.painel .entity-full .ef-count {
+  color: var(--fx-ice);
+  background: rgba(34, 211, 238, 0.1);
+  font-family: var(--fx-mono);
+}
+.painel .entity-full .ef-empty,
+.painel .entity-full .ef-muted {
+  color: #6b8aa3;
+}
+.painel .entity-full .ef-status-msg {
+  color: #9fb6c8;
+}
+.painel .entity-full .profile-masked {
+  font-family: var(--fx-mono);
+}
+.painel .entity-full .profile-reveal {
+  color: #7dd3fc;
+}
+.painel .entity-full .profile-reveal:hover {
+  color: #fff;
+  filter: drop-shadow(0 0 6px var(--fx-cyan));
+}
+.painel .entity-full .dos .dos-score,
+.painel .entity-full .fin-score {
+  background-image: radial-gradient(130% 100% at 50% 0%, rgba(34, 211, 238, 0.12), transparent 65%);
+}
+.painel .entity-full .fin-score.renda {
+  background-image: radial-gradient(130% 100% at 50% 0%, rgba(52, 211, 153, 0.14), transparent 65%);
+}
+.painel .entity-full .fin-score.renda b {
+  color: #6ee7b7;
+}
+.painel .entity-full .gauge-track {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+.painel .entity-full .gauge-readout b {
+  color: #fff;
+}
+.painel .entity-full .gauge-knob {
+  fill: #071423;
+}
+.painel .entity-full .dos-value,
+.painel .entity-full .jur-proc-title h4,
+.painel .entity-full .jur-proc-value,
+.painel .entity-full .jur-cp-body strong,
+.painel .entity-full .jur-lawyer strong {
+  color: #f1fbff;
+}
+.painel .entity-full .ctx-why {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.1), rgba(8, 20, 36, 0.8) 55%);
+  border-color: rgba(248, 113, 113, 0.28);
+}
+.painel .entity-full .ctx-why-title {
+  color: #fca5a5;
+}
+.painel .entity-full .ctx-why-other {
+  color: #fff;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+}
+.painel .entity-full .ctx-why-tag,
+.painel .entity-full .ctx-why-badge {
+  background: rgba(4, 12, 22, 0.9);
+}
+.painel .entity-full .ctx-why-procs b {
+  color: #f1fbff;
+}
+.painel .entity-full .expand-cta {
+  background: linear-gradient(120deg, rgba(34, 211, 238, 0.12), rgba(8, 20, 36, 0.8) 70%);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+.painel .entity-full .expand-cta b {
+  color: var(--fx-ice);
+}
+.painel .entity-full .expand-cta .expand-cta-btn {
+  color: #031018;
+  background: linear-gradient(135deg, #a5f3fc, #22d3ee 50%, #06b6d4);
+  box-shadow: 0 8px 22px rgba(34, 211, 238, 0.35);
+}
+.painel .entity-full .jur .jur-filter.active {
+  color: #031018;
+  background: var(--fx-cyan);
+  border-color: var(--fx-cyan);
+}
+.painel .entity-full .jur .jur-search,
+.painel .entity-full .jur .jur-sort,
+.painel .entity-full .jur .jur-filter,
+.painel .entity-full .jur .jur-more,
+.painel .entity-full .jur .jur-num {
+  color: #cfe3ee;
+  background-color: rgba(2, 8, 16, 0.7);
+  border-color: rgba(125, 211, 252, 0.22);
+  color-scheme: dark;
+}
+.painel .entity-full .jur-mov {
+  background: rgba(255, 255, 255, 0.03);
+}
+.painel .entity-full .jur-mov.recent {
+  background: rgba(245, 158, 11, 0.08);
+}
+.painel .entity-full .jur-mov b {
+  color: #e6f6fb;
+}
+.painel .entity-full .jur-parte.self {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.16), transparent);
+}
+.painel .entity-full .jur-parte-body strong {
+  color: #f1fbff;
+}
+.painel .entity-full .image-lightbox {
+  background: rgba(2, 6, 13, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+/* ── troca de aba e surgimento na rolagem ── */
+.painel .entity-full .ef-pages > * {
+  animation: ef-rise 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.painel .entity-full .ef-pages > *:nth-child(2) { animation-delay: 0.06s; }
+.painel .entity-full .ef-pages > *:nth-child(3) { animation-delay: 0.12s; }
+.painel .entity-full .ef-pages > *:nth-child(4) { animation-delay: 0.18s; }
+.painel .entity-full .ef-pages > *:nth-child(n + 5) { animation-delay: 0.24s; }
+@keyframes ef-rise {
+  from { opacity: 0; transform: translateY(18px); }
+}
+@supports (animation-timeline: view()) {
+  .painel .entity-full .ef-card,
+  .painel .entity-full .jur-proc,
+  .painel .entity-full .jur-cp,
+  .painel .entity-full .ct-tile,
+  .painel .entity-full .car-tile {
+    animation: ef-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+@keyframes ef-reveal {
+  from { opacity: 0; transform: translateY(26px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── "descriptografia" ao revelar um valor mascarado ── */
+.pm-text {
+  position: relative;
+}
+.profile-masked.is-decrypting .pm-real {
+  color: transparent;
+}
+.pm-scramble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: pre;
+  color: var(--fx-cyan, #22d3ee);
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .painel .entity-full *,
+  .painel .entity-full *::before,
+  .painel .entity-full *::after {
+    animation: none !important;
+  }
+}

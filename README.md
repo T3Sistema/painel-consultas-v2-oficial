@@ -9,17 +9,22 @@ prevenção de loops.
 
 ## Interface
 
-Layout em grade, sempre em modo claro: topbar com busca inteligente e ações;
-sidebar esquerda com filtros (switches), profundidade e legenda; workspace
-central com breadcrumb, indicador de nível e o mapa (nós circulares com cartão
-de rótulo, arestas com chip de relacionamento e controles centrais); painel
-direito de detalhes com abas (Visão geral / Sócios / Histórico) e modo
-Estatísticas (Indicadores / Linha do tempo). Percentuais de participação
-societária não são exibidos nem exportados.
+Tema "noite", no tom do logo (preto + ciano elétrico), do login ao detalhe:
+login, tela inicial, carregamento e consultas salvas dividem o mesmo cenário
+(`src/home.css`, `src/components/home/`: rede viva em canvas, núcleo do
+logo, chão em perspectiva). O painel do mapa usa a paleta neon de
+`src/lib/colors.ts` com a camada `src/painel-noite.css` sobre `painel.css`;
+o detalhe em tela cheia usa `src/painel-detalhe-noite.css` (gerado a partir
+das cores de `painel.css`, convertidas por papel — texto, fundo, borda,
+sombra) mais os ajustes e efeitos de `src/painel-detalhe-fx.css`.
 
-A identidade visual é totalmente branca e neutra (preto/grafite/cinza — sem azul):
-empresas são círculos grafite preenchidos, pessoas são círculos brancos com borda,
-baixadas têm contorno tracejado e filiais usam cinza médio.
+Topbar com busca inteligente e ações; sidebar esquerda com filtros
+(switches), profundidade e legenda; workspace central com o mapa (nós
+circulares com cartão de rótulo, arestas com chip de relacionamento e
+controles centrais). Clicar num nó abre o detalhe em tela cheia, que "nasce"
+do próprio nó (círculo que se abre até cobrir a tela e se recolhe de volta
+ao fechar). Percentuais de participação societária não são exibidos nem
+exportados. Tudo respeita `prefers-reduced-motion`.
 
 ## Funcionalidades
 

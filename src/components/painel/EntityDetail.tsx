@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { prefersReducedMotion } from '../../lib/motion';
 import { useGraphStore } from '../../store/graphStore';
 import { usePersonProfileStore } from '../../store/personProfileStore';
 import { formatCNPJ, formatCPF, formatCurrency, formatDate, normalizeText } from '../../lib/format';
@@ -253,6 +255,9 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
               setSearchQuery('');
             }}
           >
+            {!query && i === activePage && (
+              <motion.span layoutId="ef-tab-indicator" className="ef-tab-indicator" transition={{ type: 'spring', stiffness: 380, damping: 34 }} />
+            )}
             {name}
           </button>
         ))}
@@ -434,6 +439,36 @@ const isEmpty = (v: unknown) => v == null || v === '' || String(v).toLowerCase()
  * temáticas (incluindo a "Timeline"); empresa numa página única e
  * estruturada. O × (ou clicar numa conexão) volta ao mapa.
  */
+/** Centro (na tela) do círculo de um nó do mapa — de onde o detalhe "nasce". */
+function nodeScreenCenter(id: string | null): { x: number; y: number } {
+  const fallback = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  if (!id) return fallback;
+  const el = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node')).find((n) => n.dataset.id === id);
+  const circle = el?.querySelector('.rf-circle');
+  if (!circle) return fallback;
+  const r = circle.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/**
+ * Raio (em % — referência do clip-path: diagonal/√2 da caixa) que cobre a
+ * tela inteira a partir de um ponto, com folga para redimensionamentos.
+ */
+function coverPercent(o: { x: number; y: number }): number {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const far = Math.max(Math.hypot(o.x, o.y), Math.hypot(w - o.x, o.y), Math.hypot(o.x, h - o.y), Math.hypot(w - o.x, h - o.y));
+  const ref = Math.hypot(w, h) / Math.SQRT2;
+  return Math.ceil((far / ref) * 100) + 10;
+}
+
+/**
+ * Detalhe da entidade em TELA CHEIA (substitui o antigo painel lateral). Ao
+ * clicar num nó do mapa, sobrepõe o app inteiro — e "nasce" do próprio nó:
+ * um círculo se abre a partir dele até cobrir a tela, e ao fechar se recolhe
+ * de volta para o nó. Pessoa em páginas/abas temáticas; empresa numa página
+ * única e estruturada. O × (ou Esc) volta ao mapa.
+ */
 export function EntityDetail() {
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const nodeIndex = useGraphStore((s) => s.nodeIndex);
@@ -441,6 +476,12 @@ export function EntityDetail() {
   const focusNode = useGraphStore((s) => s.focusNode);
 
   const node = selectedNodeId ? nodeIndex.get(selectedNodeId) : null;
+  const reduced = useMemo(() => prefersReducedMotion(), []);
+  const [origin, setOrigin] = useState(() => ({ x: 0, y: 0 }));
+
+  useLayoutEffect(() => {
+    if (selectedNodeId) setOrigin(nodeScreenCenter(selectedNodeId));
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (!node) return;
@@ -451,25 +492,51 @@ export function EntityDetail() {
     return () => window.removeEventListener('keydown', onKey);
   }, [node, selectNode]);
 
-  if (!node) return null;
-
   const goTo = (id: string) => {
     selectNode(id);
     focusNode(id);
   };
 
+  // holofote: o cartão sob o mouse recebe a posição do cursor
+  const onPointerMove = (e: React.PointerEvent) => {
+    const card = (e.target as HTMLElement).closest?.('.ef-card') as HTMLElement | null;
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    card.style.setProperty('--my', `${e.clientY - r.top}px`);
+  };
+
+  // mesma unidade nas duas pontas (%), para a saída interpolar de volta ao nó
+  const closed = `circle(0% at ${origin.x}px ${origin.y}px)`;
+  const open = `circle(${coverPercent(origin)}% at ${origin.x}px ${origin.y}px)`;
+
   return (
-    <div className="entity-full" role="dialog" aria-modal="true" aria-label={`Detalhes de ${node.label}`}>
-      <div className="entity-full-topbar">
-        <span className="entity-full-kind">{node.kind === 'company' ? 'Empresa / CNPJ' : 'Pessoa / CPF'}</span>
-        <button className="entity-full-close" onClick={() => selectNode(null)} aria-label="Fechar e voltar ao mapa" type="button">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-          <span>Voltar ao mapa</span>
-        </button>
-      </div>
-      {node.kind === 'company' ? <CompanyDetail node={node} onGo={goTo} /> : <PersonDetail node={node} onGo={goTo} />}
-    </div>
+    <AnimatePresence>
+      {node && (
+        <motion.div
+          key="entity-full"
+          className="entity-full"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalhes de ${node.label}`}
+          onPointerMove={onPointerMove}
+          initial={reduced ? { opacity: 0 } : { clipPath: closed }}
+          animate={reduced ? { opacity: 1 } : { clipPath: open }}
+          exit={reduced ? { opacity: 0 } : { clipPath: closed }}
+          transition={{ duration: reduced ? 0.15 : 0.6, ease: [0.7, 0, 0.2, 1] }}
+        >
+          <div className="entity-full-topbar">
+            <span className="entity-full-kind">{node.kind === 'company' ? 'Empresa / CNPJ' : 'Pessoa / CPF'}</span>
+            <button className="entity-full-close" onClick={() => selectNode(null)} aria-label="Fechar e voltar ao mapa" type="button">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+              <span>Voltar ao mapa</span>
+            </button>
+          </div>
+          {node.kind === 'company' ? <CompanyDetail node={node} onGo={goTo} /> : <PersonDetail node={node} onGo={goTo} />}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
