@@ -1007,6 +1007,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
       // 2. Perfil de cada pessoa (um de cada vez, pela fila normal) → empresas/processos/parentes.
       const failed: GraphNode[] = [];
+      const motivos = new Set<string>();
       for (const node of personNodes) {
         const cpf = node.person!.cpf;
         let ok = true;
@@ -1017,8 +1018,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
             node.label = nome;
             node.person = { ...node.person!, nome };
           }
-        } catch {
+        } catch (err) {
           ok = false;
+          // Mensagem já neutra (envelope do servidor) — ajuda a distinguir indisponibilidade de "sem resultado".
+          if (err instanceof Error && err.message) motivos.add(err.message);
         }
         if (get().graphEpoch !== epoch) return;
         if (ok) await expandPersonViaProfile(get, set, node);
@@ -1030,19 +1033,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         }));
       }
 
-      if (failed.length === people.length) {
-        set({ loading: false, error: 'Não foi possível carregar as pessoas vinculadas a este telefone. Tente novamente.', searchPhase: 'error' });
-        return;
-      }
-
+      // O mapa abre mesmo que nenhum perfil carregue: as pessoas (nome + CPF) já
+      // vieram da busca por telefone, e cada uma fica clicável para tentar de novo.
       const avisos: string[] = [];
       if (found.length > people.length) {
         avisos.push(`Este telefone tem ${found.length} pessoas vinculadas; o mapa mostra as ${people.length} primeiras.`);
       }
       if (failed.length > 0) {
-        avisos.push(
-          `Não foi possível carregar ${failed.map(nomeDoNo).join(', ')} agora — clique na pessoa no mapa para tentar de novo.`,
-        );
+        const quem = failed.length === people.length ? 'o perfil das pessoas' : `o perfil de ${failed.map(nomeDoNo).join(', ')}`;
+        const motivo = motivos.size > 0 ? ` (${[...motivos].join(' / ')})` : '';
+        avisos.push(`Não foi possível carregar ${quem} agora${motivo}. Clique na pessoa no mapa para tentar de novo.`);
       }
       set({
         nodes: [...get().nodeIndex.values()],

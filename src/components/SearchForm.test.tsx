@@ -12,7 +12,7 @@ vi.mock('../services/savedQueries', () => ({
   getSavedQuery: getSavedQueryMock,
 }));
 
-import { SearchForm } from './SearchForm';
+import { SearchForm, resetRememberedSearch } from './SearchForm';
 import { useGraphStore } from '../store/graphStore';
 import { maskCNPJ } from '../lib/format';
 
@@ -21,6 +21,7 @@ describe('SearchForm — branding e busca de CNPJ', () => {
     listSavedQueriesMock.mockReset().mockResolvedValue([]);
     getSavedQueryMock.mockReset();
     useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+    resetRememberedSearch();
   });
   afterEach(() => cleanup());
 
@@ -72,6 +73,7 @@ describe('SearchForm — Consulta Avançada (busca por CPF)', () => {
     listSavedQueriesMock.mockReset().mockResolvedValue([]);
     getSavedQueryMock.mockReset();
     useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+    resetRememberedSearch();
   });
   afterEach(() => cleanup());
 
@@ -120,6 +122,7 @@ describe('SearchForm — busca por Telefone', () => {
     listSavedQueriesMock.mockReset().mockResolvedValue([]);
     getSavedQueryMock.mockReset();
     useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+    resetRememberedSearch();
   });
   afterEach(() => cleanup());
 
@@ -154,6 +157,16 @@ describe('SearchForm — busca por Telefone', () => {
     expect(startPhoneSearch).toHaveBeenCalledWith('82999765011');
   });
 
+  it('5. ao voltar do carregamento, a aba Telefone e o número continuam lá', () => {
+    useGraphStore.setState({ startPhoneSearch: vi.fn() });
+    const { unmount } = render(<SearchForm />);
+    fireEvent.change(openPhoneTab(), { target: { value: '(82) 99976-5011' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    unmount();
+    render(<SearchForm />);
+    expect(screen.getByPlaceholderText('(00) 00000-0000')).toHaveValue('(82) 99976-5011');
+  });
+
   it('4. erro da busca (ex.: nenhuma pessoa) aparece na tela inicial', () => {
     useGraphStore.setState({ error: 'Nenhuma pessoa encontrada para o telefone (82) 99976-5011.' });
     render(<SearchForm />);
@@ -166,6 +179,7 @@ describe('SearchForm — Consultas recentes', () => {
     listSavedQueriesMock.mockReset();
     getSavedQueryMock.mockReset();
     useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+    resetRememberedSearch();
   });
   afterEach(() => cleanup());
 

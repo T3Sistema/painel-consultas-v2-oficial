@@ -1184,7 +1184,28 @@ describe('startPhoneSearch — busca por telefone abre o mapa com todas as pesso
     const s = useGraphStore.getState();
     expect(s.rootId).toBe(personId(PERSON_CPF));
     expect(s.nodeIndex.get(personId(OUTRO_SOCIO_CPF))?.expanded).toBe(false); // clicável para tentar de novo
-    expect(s.notice).toMatch(/Não foi possível carregar B/);
+    expect(s.notice).toMatch(/Não foi possível carregar o perfil de B agora \(Serviço temporariamente indisponível\.\)/);
+  });
+
+  it('3b. nenhum perfil carrega → o mapa abre mesmo assim com as duas pessoas e o motivo', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/consulta-telefone')) {
+        return jsonResponse({ status: 'sucesso', pessoas: [{ cpf: PERSON_CPF, nome: 'A' }, { cpf: OUTRO_SOCIO_CPF, nome: 'B' }] });
+      }
+      return jsonResponse({ code: 'service_unavailable', message: 'Não foi possível processar a solicitação neste momento.' }, 402);
+    });
+
+    await useGraphStore.getState().startPhoneSearch(PHONE);
+
+    const s = useGraphStore.getState();
+    expect(s.error).toBeNull();
+    expect(s.rootId).toBe(personId(PERSON_CPF));
+    expect(s.nodes.map((n) => n.label).sort()).toEqual(['A', 'B']);
+    expect(s.links.some((l) => l.type === 'TELEFONE')).toBe(true);
+    expect(s.nodes.every((n) => !n.expanded)).toBe(true);
+    expect(s.notice).toBe(
+      'Não foi possível carregar o perfil das pessoas agora (Não foi possível processar a solicitação neste momento.). Clique na pessoa no mapa para tentar de novo.',
+    );
   });
 
   it('4. erro na busca do telefone → mensagem neutra na tela de busca', async () => {

@@ -21,7 +21,8 @@ export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTML
 
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(clearNotice, 4000);
+    // Avisos longos (ex.: motivo de falha) ficam mais tempo na tela: ~60ms por caractere, entre 4s e 12s.
+    const t = setTimeout(clearNotice, Math.min(12000, Math.max(4000, notice.length * 60)));
     return () => clearTimeout(t);
   }, [notice, clearNotice]);
 

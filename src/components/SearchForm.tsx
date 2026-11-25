@@ -24,6 +24,17 @@ const RECENT_LIMIT = 5;
 
 type SearchMode = 'cnpj' | 'cpf' | 'telefone';
 
+/**
+ * Aba e textos digitados sobrevivem à ida ao mapa (ou à tela de carregamento)
+ * e à volta: o formulário é desmontado nesse meio-tempo. Só em memória.
+ */
+const remembered: { mode: SearchMode; cnpj: string; cpf: string; phone: string } = { mode: 'cnpj', cnpj: '', cpf: '', phone: '' };
+
+/** Só para testes: volta ao estado inicial do formulário. */
+export function resetRememberedSearch() {
+  Object.assign(remembered, { mode: 'cnpj', cnpj: '', cpf: '', phone: '' });
+}
+
 function LockIcon() {
   return (
     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2">
@@ -231,10 +242,13 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
   const searchFailedCpfs = useGraphStore((s) => s.searchFailedCpfs);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
-  const [mode, setMode] = useState<SearchMode>('cnpj');
-  const [cnpj, setCnpj] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [phone, setPhone] = useState('');
+  const [mode, setMode] = useState<SearchMode>(remembered.mode);
+  const [cnpj, setCnpj] = useState(remembered.cnpj);
+  const [cpf, setCpf] = useState(remembered.cpf);
+  const [phone, setPhone] = useState(remembered.phone);
+  useEffect(() => {
+    Object.assign(remembered, { mode, cnpj, cpf, phone });
+  }, [mode, cnpj, cpf, phone]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
   const [focused, setFocused] = useState(false);
