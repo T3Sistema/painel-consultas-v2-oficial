@@ -86,6 +86,7 @@ A camada de dados é plugável (`src/services/provider.ts`):
 |---|---|---|
 | **DabraData** (antes FonteData; rota interna `/api/consulta-empresa`) | ✅ | — |
 | **APIFull** (rota interna `/api/consulta-pessoa`) | — | ✅ (perfil completo + `sociedades[]`) |
+| **APIFull** (rota interna `/api/consulta-telefone`, `pessoa-telefone`) | — | Telefone → CPFs vinculados (o dossiê de cada um vem de `/api/consulta-pessoa`) |
 
 Nenhuma chamada é feita direto do navegador para a DabraData/APIFull:
 `api/consulta-empresa.ts` e `api/consulta-pessoa.ts` (Vercel Edge Functions)
@@ -282,7 +283,8 @@ api/
 │   ├── index.ts            # GET lista / POST cria (snapshot + upload de imagens)
 │   └── [id].ts              # GET abre (signed URLs) / DELETE exclui (+ imagens do bucket)
 ├── consulta-empresa.ts     # Vercel Edge Function: proxy same-origin p/ DabraData — cadastro-pj-plus (protegida por sessão)
-└── consulta-pessoa.ts      # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
+├── consulta-pessoa.ts      # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
+└── consulta-telefone.ts    # Vercel Edge Function: APIFull pessoa-telefone → só { cpf, nome, nascimento } (protegida por sessão)
 
 supabase/migrations/        # users, sessions, saved_queries, saved_query_images, mirrored_images (RLS sem policies)
 
@@ -294,6 +296,7 @@ src/
 │   ├── provider.ts         # interface DataProvider (plugável)
 │   ├── fontedata.ts        # provedor real (API comercial FonteData)
 │   ├── apifull.ts          # perfil completo + sociedades[] (API comercial APIFull)
+│   ├── phoneLookup.ts      # client de /api/consulta-telefone (telefone → pessoas vinculadas)
 │   └── savedQueries.ts     # client das rotas /api/saved-queries/*
 ├── store/
 │   ├── authStore.ts           # Zustand: sessão do usuário (login/logout/checkSession)
@@ -320,3 +323,21 @@ src/
                               # FiltersSidebar, Workspace, DetailsPanel, PersonProfilePanel,
                               # ImageLightbox, SaveQueryButton, CollapsibleSection
 ```
+
+## Busca por telefone
+
+Aba **Telefone** na tela inicial: aceita fixo (10 dígitos) ou celular (11,
+começando com 9), com DDD; `+55` é removido. O servidor chama
+`POST https://api.apifull.com.br/api/pessoa-telefone` com
+`{ "telefone": "<DDD+número só dígitos>", "link": "pessoa-telefone" }` e
+devolve ao navegador apenas `{ status, pessoas: [{ cpf, nome?, nascimento? }] }`.
+
+O contrato público da APIFull não descreve o formato de `dados` dessa
+consulta, então `extractPhoneMatches` lê de forma estrutural: qualquer objeto
+com um campo de CPF válido (`cpf`, `cpf_*`, `*_cpf`, `documento`) vira um
+resultado, com o nome do mesmo objeto ou do pai. Se uma resposta com
+`status: "sucesso"` não render nenhum CPF, o log `[apifull-telefone]` grava
+os **nomes das chaves** de topo de `dados` (nunca valores) para ajustar a
+leitura. Com um único vínculo o dossiê abre direto; com vários, o usuário
+escolhe na lista. Cada busca por telefone é uma consulta paga, e abrir o
+dossiê é outra (`cpf-ultra`).

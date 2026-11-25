@@ -3,14 +3,16 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listSavedQueriesMock, getSavedQueryMock } = vi.hoisted(() => ({
+const { listSavedQueriesMock, getSavedQueryMock, findPeopleByPhoneMock } = vi.hoisted(() => ({
   listSavedQueriesMock: vi.fn(),
   getSavedQueryMock: vi.fn(),
+  findPeopleByPhoneMock: vi.fn(),
 }));
 vi.mock('../services/savedQueries', () => ({
   listSavedQueries: listSavedQueriesMock,
   getSavedQuery: getSavedQueryMock,
 }));
+vi.mock('../services/phoneLookup', () => ({ findPeopleByPhone: findPeopleByPhoneMock }));
 
 import { SearchForm } from './SearchForm';
 import { useGraphStore } from '../store/graphStore';
@@ -112,6 +114,76 @@ describe('SearchForm — Consulta Avançada (busca por CPF)', () => {
     expect(screen.getByPlaceholderText('00.000.000/0000-00')).toHaveValue('33.260.563/0001-78');
     fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
     expect(screen.getByPlaceholderText('000.000.000-00')).toHaveValue('111.444.777-35');
+  });
+});
+
+describe('SearchForm — busca por Telefone', () => {
+  beforeEach(() => {
+    listSavedQueriesMock.mockReset().mockResolvedValue([]);
+    getSavedQueryMock.mockReset();
+    findPeopleByPhoneMock.mockReset();
+    useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+  });
+  afterEach(() => cleanup());
+
+  const openPhoneTab = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Telefone' }));
+    return screen.getByPlaceholderText('(00) 00000-0000') as HTMLInputElement;
+  };
+
+  it('1. a aba Telefone aplica a máscara de celular', () => {
+    render(<SearchForm />);
+    const input = openPhoneTab();
+    fireEvent.change(input, { target: { value: '11987654321' } });
+    expect(input).toHaveValue('(11) 98765-4321');
+  });
+
+  it('2. telefone sem DDD é rejeitado sem consultar', () => {
+    render(<SearchForm />);
+    fireEvent.change(openPhoneTab(), { target: { value: '98765432' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    expect(screen.getByText(/com DDD/)).toBeInTheDocument();
+    expect(findPeopleByPhoneMock).not.toHaveBeenCalled();
+  });
+
+  it('3. um único vínculo abre o dossiê direto pelo CPF', async () => {
+    const startPersonSearch = vi.fn();
+    useGraphStore.setState({ startPersonSearch });
+    findPeopleByPhoneMock.mockResolvedValue([{ cpf: '11144477735', nome: 'MARIA EXEMPLO' }]);
+    render(<SearchForm />);
+    fireEvent.change(openPhoneTab(), { target: { value: '(11) 98765-4321' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await vi.waitFor(() => expect(startPersonSearch).toHaveBeenCalledWith('11144477735'));
+    expect(findPeopleByPhoneMock).toHaveBeenCalledWith('11987654321');
+  });
+
+  it('4. vários vínculos viram uma lista; escolher um abre o dossiê', async () => {
+    const startPersonSearch = vi.fn();
+    useGraphStore.setState({ startPersonSearch });
+    findPeopleByPhoneMock.mockResolvedValue([
+      { cpf: '11144477735', nome: 'MARIA EXEMPLO', nascimento: '1980-01-02' },
+      { cpf: '52998224725', nome: 'JOAO EXEMPLO' },
+    ]);
+    render(<SearchForm />);
+    fireEvent.change(openPhoneTab(), { target: { value: '(11) 98765-4321' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await screen.findByText('2 pessoas vinculadas', { exact: false });
+    expect(screen.getByText('111.444.777-35 · 02/01/1980')).toBeInTheDocument();
+    expect(startPersonSearch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('JOAO EXEMPLO'));
+    expect(startPersonSearch).toHaveBeenCalledWith('52998224725');
+  });
+
+  it('5. nenhum vínculo mostra aviso; erro mostra a mensagem neutra', async () => {
+    findPeopleByPhoneMock.mockResolvedValueOnce([]);
+    render(<SearchForm />);
+    fireEvent.change(openPhoneTab(), { target: { value: '(31) 3456-7890' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await screen.findByText(/Nenhuma pessoa encontrada para o telefone \(31\) 3456-7890/);
+
+    findPeopleByPhoneMock.mockRejectedValueOnce(new Error('Serviço temporariamente indisponível.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await screen.findByText('Serviço temporariamente indisponível.');
   });
 });
 

@@ -36,6 +36,49 @@ export function maskCPF(value: string): string {
 }
 
 /**
+ * Normaliza um telefone brasileiro para só DDD + número (10 ou 11 dígitos):
+ * remove pontuação e um eventual prefixo de país "55" (ex.: "+55 11 9…").
+ */
+export function normalizePhone(value: string): string {
+  const d = onlyDigits(value);
+  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) return d.slice(2);
+  return d;
+}
+
+/**
+ * Telefone brasileiro com DDD: fixo (10 dígitos, começando com 2–8 depois do
+ * DDD) ou celular (11 dígitos, começando com 9). DDD válido = dois dígitos de 1 a 9.
+ */
+export function isValidPhone(value: string): boolean {
+  const d = normalizePhone(value);
+  if (d.length !== 10 && d.length !== 11) return false;
+  if (!/^[1-9]{2}/.test(d)) return false;
+  if (d.length === 11 && d[2] !== '9') return false;
+  // Fixo começa com 2–8; 10 dígitos começando com 9 é um celular incompleto.
+  if (d.length === 10 && !/[2-8]/.test(d[2])) return false;
+  if (/^(\d)\1+$/.test(d)) return false;
+  return true;
+}
+
+/** Máscara progressiva para digitação de telefone: (11) 98765-4321 ou (11) 3456-7890. */
+export function maskPhone(value: string): string {
+  const d = onlyDigits(value).slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  const ddd = d.slice(0, 2);
+  const rest = d.slice(2);
+  if (rest.length <= 4) return `(${ddd}) ${rest}`;
+  const split = d.length === 11 ? 5 : 4;
+  return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`;
+}
+
+export function formatPhone(value: string): string {
+  const d = normalizePhone(value);
+  if (d.length !== 10 && d.length !== 11) return value;
+  return maskPhone(d);
+}
+
+/**
  * Posição do cursor, dentro de uma string já mascarada (CNPJ/CPF), logo após
  * o N-ésimo dígito — usada para devolver o cursor ao lugar certo depois de
  * reformatar em `onChange` (senão o React reposiciona pro fim do valor a

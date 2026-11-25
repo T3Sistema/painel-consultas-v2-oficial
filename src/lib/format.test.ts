@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caretPositionForDigitCount, isValidCPF, maskCPF } from './format';
+import { caretPositionForDigitCount, isValidCPF, isValidPhone, maskCPF, maskPhone, normalizePhone } from './format';
 
 describe('maskCPF', () => {
   it('aplica a máscara progressivamente conforme os dígitos entram', () => {
@@ -54,5 +54,33 @@ describe('isValidCPF', () => {
   it('rejeita sequência de dígitos repetidos', () => {
     expect(isValidCPF('111.111.111-11')).toBe(false);
     expect(isValidCPF('00000000000')).toBe(false);
+  });
+});
+
+describe('telefone', () => {
+  it('maskPhone formata fixo e celular progressivamente', () => {
+    expect(maskPhone('')).toBe('');
+    expect(maskPhone('1')).toBe('(1');
+    expect(maskPhone('119')).toBe('(11) 9');
+    expect(maskPhone('3134567890')).toBe('(31) 3456-7890');
+    expect(maskPhone('11987654321')).toBe('(11) 98765-4321');
+    expect(maskPhone('119876543210000')).toBe('(11) 98765-4321');
+  });
+
+  it('isValidPhone exige DDD e o formato de fixo/celular', () => {
+    expect(isValidPhone('(11) 98765-4321')).toBe(true);
+    expect(isValidPhone('(31) 3456-7890')).toBe(true);
+    expect(isValidPhone('+55 11 98765-4321')).toBe(true);
+    expect(isValidPhone('98765-4321')).toBe(false);
+    expect(isValidPhone('(11) 8765-43210')).toBe(false); // 11 dígitos sem o 9
+    expect(isValidPhone('(11) 9876-5432')).toBe(false); // celular incompleto
+    expect(isValidPhone('(01) 3456-7890')).toBe(false); // DDD inválido
+    expect(isValidPhone('11111111111')).toBe(false);
+  });
+
+  it('normalizePhone remove o prefixo 55', () => {
+    expect(normalizePhone('+55 (11) 98765-4321')).toBe('11987654321');
+    expect(normalizePhone('5511987654321')).toBe('11987654321');
+    expect(normalizePhone('(55) 3456-7890')).toBe('5534567890');
   });
 });
