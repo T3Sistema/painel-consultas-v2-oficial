@@ -10,7 +10,8 @@ import type {
   TimelineEvent,
 } from '../types/graph';
 import { defaultFilters } from '../types/graph';
-import { formatCPF, isValidCPF, onlyDigits } from '../lib/format';
+import { formatCPF, formatPhone, isValidCPF, onlyDigits } from '../lib/format';
+import { findPeopleByPhone } from '../services/phoneLookup';
 import type { DataProvider } from '../services/provider';
 import {
   FORCE_DEFAULTS,
@@ -58,6 +59,13 @@ const linkId = (source: string, target: string, type: RelationType) => `${source
 
 /** Teto de contrapartes judiciais desenhadas por pessoa (as demais seguem na aba "Jurídico"). */
 const MAX_COUNTERPARTIES_PER_PERSON = 40;
+
+/**
+ * Quantas pessoas de uma busca por telefone entram no mapa de uma vez — cada
+ * uma é um perfil completo + as empresas dela. As demais ficam de fora com
+ * aviso (raro: um número costuma ter poucas pessoas vinculadas).
+ */
+export const MAX_PHONE_PEOPLE = 8;
 
 /** Limite de segurança para o "Expandir Tudo" não explodir a renderização */
 const EXPAND_ALL_NODE_CAP = 600;
@@ -137,6 +145,12 @@ interface GraphState {
   startPersonSearch: (cpf: string) => Promise<void>;
   /** Reprocessa só os CPFs que falharam no lote da busca inicial (ou de uma tentativa anterior). */
   retryFailedSearchProfiles: () => Promise<void>;
+  /**
+   * Busca por telefone — abre o mapa com TODAS as pessoas vinculadas ao
+   * número (cada uma com suas empresas, processos e parentes), ligadas
+   * entre si pela aresta "Mesmo telefone".
+   */
+  startPhoneSearch: (telefone: string) => Promise<void>;
   /** Libera o mapa mesmo com falhas pendentes — ação explícita do usuário. */
   continueWithAvailableData: () => void;
   expandNode: (id: string, opts?: { force?: boolean; batchId?: string }) => Promise<void>;
@@ -171,6 +185,7 @@ const RELATION_ORDER: RelationType[] = [
   'FILIAL',
   'MATRIZ',
   'PARTICIPACAO',
+  'TELEFONE',
   'PARENTE',
   'PROCESSO',
   'COPARTE',
@@ -200,6 +215,7 @@ const PRIMARY_RELATION_PRIORITY: RelationType[] = [
   'CONTROLADA',
   'MATRIZ',
   'FILIAL',
+  'TELEFONE',
   // rede de contexto: nunca vence uma relação societária
   'PARENTE',
   'PROCESSO',
@@ -933,6 +949,111 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         layerLoading: false,
         searchPhase: 'done',
         unsavedChanges: true,
+      });
+    } catch (e) {
+      if (get().graphEpoch !== epoch) return;
+      set({ loading: false, error: e instanceof Error ? e.message : 'Erro na consulta', searchPhase: 'error' });
+    }
+  },
+
+  startPhoneSearch: async (telefone: string) => {
+    usePersonProfileStore.getState().cancelPendingQueue();
+    const epoch = get().graphEpoch + 1;
+    set({
+      loading: true,
+      error: null,
+      notice: null,
+      nodes: [],
+      links: [],
+      nodeIndex: new Map(),
+      timeline: [],
+      breadcrumb: [],
+      selectedNodeId: null,
+      rootId: null,
+      graphEpoch: epoch,
+      searchPhase: 'company',
+      searchProfilesTotal: 0,
+      searchProfilesDone: 0,
+      searchProfilesFailed: 0,
+      searchFailedCpfs: [],
+      searchPendingRootId: null,
+    });
+    try {
+      const found = await findPeopleByPhone(telefone);
+      if (get().graphEpoch !== epoch) return;
+      if (found.length === 0) {
+        set({ loading: false, error: `Nenhuma pessoa encontrada para o telefone ${formatPhone(telefone)}.`, searchPhase: 'error' });
+        return;
+      }
+      const people = found.slice(0, MAX_PHONE_PEOPLE);
+
+      // 1. Todas as pessoas entram na camada 0, ligadas à primeira pelo telefone em comum.
+      const nodeIndex = new Map<string, GraphNode>();
+      const personNodes: GraphNode[] = people.map((p) => {
+        const nome = p.nome?.trim() || formatCPF(p.cpf);
+        const node: GraphNode = { id: personId(p.cpf), kind: 'person', label: nome, depth: 0, expanded: false, person: { cpf: p.cpf, nome } };
+        nodeIndex.set(node.id, node);
+        return node;
+      });
+      const rootId = personNodes[0].id;
+      const links: GraphLink[] = [];
+      for (const other of personNodes.slice(1)) {
+        addOrMergeLink(links, rootId, other.id, 'TELEFONE', {
+          funcao: 'Mesmo telefone',
+          origem: `Telefone ${formatPhone(telefone)}`,
+        });
+      }
+      set({ nodes: [...nodeIndex.values()], links, nodeIndex, searchPhase: 'profiles', searchProfilesTotal: people.length });
+
+      // 2. Perfil de cada pessoa (um de cada vez, pela fila normal) → empresas/processos/parentes.
+      const failed: GraphNode[] = [];
+      for (const node of personNodes) {
+        const cpf = node.person!.cpf;
+        let ok = true;
+        try {
+          const profile = await usePersonProfileStore.getState().loadProfile(cpf);
+          const nome = extractPersonName(profile);
+          if (nome && node.label === formatCPF(cpf)) {
+            node.label = nome;
+            node.person = { ...node.person!, nome };
+          }
+        } catch {
+          ok = false;
+        }
+        if (get().graphEpoch !== epoch) return;
+        if (ok) await expandPersonViaProfile(get, set, node);
+        else failed.push(node);
+        if (get().graphEpoch !== epoch) return;
+        set((st) => ({
+          searchProfilesDone: st.searchProfilesDone + 1,
+          searchProfilesFailed: st.searchProfilesFailed + (ok ? 0 : 1),
+        }));
+      }
+
+      if (failed.length === people.length) {
+        set({ loading: false, error: 'Não foi possível carregar as pessoas vinculadas a este telefone. Tente novamente.', searchPhase: 'error' });
+        return;
+      }
+
+      const avisos: string[] = [];
+      if (found.length > people.length) {
+        avisos.push(`Este telefone tem ${found.length} pessoas vinculadas; o mapa mostra as ${people.length} primeiras.`);
+      }
+      if (failed.length > 0) {
+        avisos.push(
+          `Não foi possível carregar ${failed.map(nomeDoNo).join(', ')} agora — clique na pessoa no mapa para tentar de novo.`,
+        );
+      }
+      set({
+        nodes: [...get().nodeIndex.values()],
+        rootId,
+        loading: false,
+        breadcrumb: [rootId],
+        currentLayer: 1,
+        layerLoading: false,
+        searchPhase: 'done',
+        unsavedChanges: true,
+        ...(avisos.length > 0 ? { notice: avisos.join(' ') } : {}),
       });
     } catch (e) {
       if (get().graphEpoch !== epoch) return;

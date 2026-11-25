@@ -338,6 +338,12 @@ com um campo de CPF válido (`cpf`, `cpf_*`, `*_cpf`, `documento`) vira um
 resultado, com o nome do mesmo objeto ou do pai. Se uma resposta com
 `status: "sucesso"` não render nenhum CPF, o log `[apifull-telefone]` grava
 os **nomes das chaves** de topo de `dados` (nunca valores) para ajustar a
-leitura. Com um único vínculo o dossiê abre direto; com vários, o usuário
-escolhe na lista. Cada busca por telefone é uma consulta paga, e abrir o
-dossiê é outra (`cpf-ultra`).
+leitura.
+
+A busca abre o mapa direto (`graphStore.startPhoneSearch`): **todas** as
+pessoas vinculadas (até `MAX_PHONE_PEOPLE` = 8) entram na camada 0, ligadas
+à primeira por uma aresta `TELEFONE` ("Mesmo telefone"), e cada uma é
+expandida como na busca por CPF (perfil completo → empresas, processos e
+parentes na camada 1). Se o perfil de alguém falhar, o mapa abre mesmo assim,
+com aviso, e a pessoa fica clicável para tentar de novo. Custo: 1 consulta
+`pessoa-telefone` + 1 `cpf-ultra` por pessoa + as empresas de cada uma.

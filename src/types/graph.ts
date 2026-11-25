@@ -19,7 +19,9 @@ export type RelationType =
   /** Partes no mesmo polo de um processo (ex.: co-executados). */
   | 'COPARTE'
   /** Vínculo familiar declarado no perfil. */
-  | 'PARENTE';
+  | 'PARENTE'
+  /** Pessoas vinculadas ao mesmo telefone (busca por telefone). */
+  | 'TELEFONE';
 
 /** Relações que vêm do perfil da pessoa (processos/família), não do quadro societário. */
 export const CONTEXT_RELATIONS: readonly RelationType[] = ['PROCESSO', 'COPARTE', 'PARENTE'];

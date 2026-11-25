@@ -25,6 +25,7 @@ export const LINK_COLORS: Record<RelationType, string> = {
   PROCESSO: '#f87171', // vermelho — litígio
   COPARTE: '#94a3b8', // ardósia — mesmo polo
   PARENTE: '#f472b6', // magenta — família
+  TELEFONE: '#60a5fa', // azul — mesmo telefone
 };
 
 export const RELATION_LABELS: Record<RelationType, string> = {
@@ -39,6 +40,7 @@ export const RELATION_LABELS: Record<RelationType, string> = {
   PROCESSO: 'Processo judicial',
   COPARTE: 'Co-parte em processo',
   PARENTE: 'Parente',
+  TELEFONE: 'Mesmo telefone',
 };
 
 const relationsOf = (l: GraphLink): RelationType[] => (l.meta.relations?.length ? l.meta.relations : [l.type]);

@@ -3,9 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
 import {
   caretPositionForDigitCount,
-  formatCPF,
   formatDate,
-  formatPhone,
   isValidCNPJ,
   isValidCPF,
   isValidPhone,
@@ -17,7 +15,6 @@ import {
 } from '../lib/format';
 import { applyMask } from '../lib/mask';
 import { listSavedQueries, getSavedQuery, type SavedQuerySummary } from '../services/savedQueries';
-import { findPeopleByPhone, type PhoneMatch } from '../services/phoneLookup';
 import { LogoCore, SpotlightCard, Typewriter } from './home/HomeParts';
 import { CountUp } from './painel/MotionBits';
 
@@ -26,57 +23,6 @@ const LOCKED_TABS = ['SMS', 'Placa', 'Email', 'Nome'];
 const RECENT_LIMIT = 5;
 
 type SearchMode = 'cnpj' | 'cpf' | 'telefone';
-
-/** Data de nascimento como veio: ISO vira dd/mm/aaaa; qualquer outro formato é mostrado intacto. */
-function formatBirth(value: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(value) ? formatDate(value.slice(0, 10)) : value;
-}
-
-/** Pessoas vinculadas ao telefone pesquisado — escolher uma abre o dossiê pelo CPF. */
-function PhoneMatches({
-  telefone,
-  matches,
-  onPick,
-}: {
-  telefone: string;
-  matches: PhoneMatch[];
-  onPick: (cpf: string) => void;
-}) {
-  if (matches.length === 0) {
-    return <p className="home-alert warn">Nenhuma pessoa encontrada para o telefone {formatPhone(telefone)}.</p>;
-  }
-  return (
-    <motion.section
-      className="home-phone-matches"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      aria-label="Pessoas vinculadas ao telefone"
-    >
-      <span className="home-kicker">
-        <i />
-        {matches.length === 1 ? '1 pessoa vinculada' : `${matches.length} pessoas vinculadas`} a {formatPhone(telefone)}
-      </span>
-      <ul className="home-recent-list">
-        {matches.map((m) => (
-          <li key={m.cpf}>
-            <button type="button" className="home-recent-item" onClick={() => onPick(m.cpf)}>
-              <span className="home-recent-dot" aria-hidden="true" />
-              <span className="home-recent-label">{m.nome ?? 'Nome não informado'}</span>
-              <span className="home-recent-date">
-                {formatCPF(m.cpf)}
-                {m.nascimento ? ` · ${formatBirth(m.nascimento)}` : ''}
-              </span>
-              <svg className="home-recent-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </motion.section>
-  );
-}
 
 function LockIcon() {
   return (
@@ -276,6 +222,7 @@ function DigitsRing({ count, total, state }: { count: number; total: number; sta
 export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => void }) {
   const startSearch = useGraphStore((s) => s.startSearch);
   const startPersonSearch = useGraphStore((s) => s.startPersonSearch);
+  const startPhoneSearch = useGraphStore((s) => s.startPhoneSearch);
   const retryFailedSearchProfiles = useGraphStore((s) => s.retryFailedSearchProfiles);
   const continueWithAvailableData = useGraphStore((s) => s.continueWithAvailableData);
   const error = useGraphStore((s) => s.error);
@@ -288,9 +235,6 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
   const [cnpj, setCnpj] = useState('');
   const [cpf, setCpf] = useState('');
   const [phone, setPhone] = useState('');
-  const [phoneLoading, setPhoneLoading] = useState(false);
-  const [phoneResult, setPhoneResult] = useState<{ telefone: string; matches: PhoneMatch[] } | null>(null);
-  const phoneRequest = useRef(0);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -335,31 +279,9 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
     setShake((n) => n + 1);
   };
 
-  const searchPhone = async (telefone: string) => {
-    const request = ++phoneRequest.current;
-    setPhoneLoading(true);
-    setPhoneResult(null);
-    try {
-      const matches = await findPeopleByPhone(telefone);
-      if (request !== phoneRequest.current) return;
-      // Um único vínculo: abre o dossiê direto, sem passo extra de escolha.
-      if (matches.length === 1) {
-        void startPersonSearch(matches[0].cpf);
-        return;
-      }
-      setPhoneResult({ telefone, matches });
-    } catch (err) {
-      if (request !== phoneRequest.current) return;
-      fail(err instanceof Error ? err.message : 'Não foi possível concluir a consulta.');
-    } finally {
-      if (request === phoneRequest.current) setPhoneLoading(false);
-    }
-  };
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode === 'telefone') {
-      if (phoneLoading) return;
       const digits = normalizePhone(phone);
       if (digits.length < 10) {
         fail('Informe o telefone com DDD (10 ou 11 dígitos).');
@@ -370,7 +292,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
         return;
       }
       setValidationError(null);
-      void searchPhone(digits);
+      void startPhoneSearch(digits);
       return;
     }
     if (mode === 'cnpj') {
@@ -514,10 +436,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
                   ref={inputRef}
                   id="telefone"
                   value={phone}
-                  onChange={(e) => {
-                    setPhoneResult(null);
-                    handleMaskedChange(maskPhone, setPhone)(e);
-                  }}
+                  onChange={handleMaskedChange(maskPhone, setPhone)}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   placeholder="(00) 00000-0000"
@@ -552,7 +471,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
             <span className={`home-count ${ringState}`} aria-hidden="true">
               {digits}/{total}
             </span>
-            <button type="submit" className="home-go" disabled={phoneLoading && mode === 'telefone'} aria-busy={phoneLoading && mode === 'telefone'}>
+            <button type="submit" className="home-go">
               <span className="home-go-shine" aria-hidden="true" />
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="11" cy="11" r="7" />
@@ -615,20 +534,6 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
             </motion.p>
           )}
         </AnimatePresence>
-
-        {mode === 'telefone' && phoneLoading && (
-          <p className="home-alert info" role="status">
-            Buscando pessoas vinculadas ao telefone…
-          </p>
-        )}
-
-        {mode === 'telefone' && phoneResult && (
-          <PhoneMatches
-            telefone={phoneResult.telefone}
-            matches={phoneResult.matches}
-            onPick={(selected) => void startPersonSearch(selected)}
-          />
-        )}
 
         {searchPhase === 'awaiting-decision' && (
           <div className="home-alert warn">

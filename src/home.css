@@ -774,22 +774,6 @@
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
-.home-alert.info {
-  color: #a5f3fc;
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid rgba(34, 211, 238, 0.3);
-}
-.home-phone-matches {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(8, 20, 32, 0.55);
-  border: 1px solid rgba(34, 211, 238, 0.18);
-  backdrop-filter: blur(10px);
-}
-.home-phone-matches .home-recent-list {
-  margin-top: 10px;
-}
 .home .home-go:disabled {
   opacity: 0.6;
   cursor: progress;

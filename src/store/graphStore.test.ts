@@ -1094,6 +1094,108 @@ describe('rede de contexto do perfil (processos judiciais e família)', () => {
   });
 });
 
+describe('startPhoneSearch — busca por telefone abre o mapa com todas as pessoas', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const PHONE = '82999765011';
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const bodyOf = (init?: RequestInit) => JSON.parse(String(init?.body ?? '{}'));
+
+  it('1. duas pessoas → ambas na camada 0, ligadas por "Mesmo telefone", cada uma com suas empresas', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/consulta-telefone')) {
+        return jsonResponse({
+          status: 'sucesso',
+          pessoas: [
+            { cpf: PERSON_CPF, nome: 'DANIELA EXEMPLO' },
+            { cpf: OUTRO_SOCIO_CPF, nome: 'POLLYANNA EXEMPLO' },
+          ],
+        });
+      }
+      if (url.includes('/api/consulta-pessoa')) {
+        if (bodyOf(init).cpf === PERSON_CPF) {
+          return apiFullSuccess([
+            { cnpj: NEW_CNPJ, razao_social: 'EMPRESA NOVA LTDA', qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF },
+          ]);
+        }
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'DANIELA EXEMPLO', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPhoneSearch(PHONE);
+
+    const s = useGraphStore.getState();
+    const a = personId(PERSON_CPF);
+    const b = personId(OUTRO_SOCIO_CPF);
+    expect(s.error).toBeNull();
+    expect(s.searchPhase).toBe('done');
+    expect(s.loading).toBe(false);
+    expect(s.rootId).toBe(a);
+    expect(s.nodeIndex.get(a)).toMatchObject({ depth: 0, label: 'DANIELA EXEMPLO', expanded: true });
+    expect(s.nodeIndex.get(b)).toMatchObject({ depth: 0, label: 'POLLYANNA EXEMPLO', expanded: true });
+    expect(s.nodeIndex.get(companyId(NEW_CNPJ))?.depth).toBe(1);
+
+    const tel = s.links.find((l) => l.type === 'TELEFONE')!;
+    expect(tel).toMatchObject({ source: a, target: b });
+    expect(tel.meta.origem).toBe('Telefone (82) 99976-5011');
+    expect(linkLabel(tel)).toBe('Mesmo telefone');
+
+    // As duas pessoas ficam visíveis na camada 1 (nenhuma some como órfã).
+    const visible = applyFilters(s.nodes.filter((n) => n.depth <= 1), s.links, defaultFilters, s.rootId);
+    expect(visible.nodes.map((n) => n.id)).toEqual(expect.arrayContaining([a, b, companyId(NEW_CNPJ)]));
+  });
+
+  it('2. nenhuma pessoa → volta à busca com aviso, sem abrir o mapa', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 'sem_resultado', pessoas: [] }));
+    await useGraphStore.getState().startPhoneSearch(PHONE);
+    const s = useGraphStore.getState();
+    expect(s.rootId).toBeNull();
+    expect(s.loading).toBe(false);
+    expect(s.error).toBe('Nenhuma pessoa encontrada para o telefone (82) 99976-5011.');
+  });
+
+  it('3. perfil de uma pessoa falha → o mapa abre com as duas e avisa qual faltou', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/consulta-telefone')) {
+        return jsonResponse({ status: 'sucesso', pessoas: [{ cpf: PERSON_CPF, nome: 'A' }, { cpf: OUTRO_SOCIO_CPF, nome: 'B' }] });
+      }
+      if (url.includes('/api/consulta-pessoa')) {
+        if (bodyOf(init).cpf === PERSON_CPF) return apiFullSuccess([]);
+        return jsonResponse({ code: 'service_unavailable', message: 'Serviço temporariamente indisponível.' }, 503);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPhoneSearch(PHONE);
+
+    const s = useGraphStore.getState();
+    expect(s.rootId).toBe(personId(PERSON_CPF));
+    expect(s.nodeIndex.get(personId(OUTRO_SOCIO_CPF))?.expanded).toBe(false); // clicável para tentar de novo
+    expect(s.notice).toMatch(/Não foi possível carregar B/);
+  });
+
+  it('4. erro na busca do telefone → mensagem neutra na tela de busca', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ code: 'rate_limited', message: 'Limite de requisições atingido.' }, 429));
+    await useGraphStore.getState().startPhoneSearch(PHONE);
+    const s = useGraphStore.getState();
+    expect(s.rootId).toBeNull();
+    expect(s.error).toBe('Limite de requisições atingido.');
+  });
+});
+
 describe('nextLayer — aguarda só o lote de CPFs da própria camada (não a fila inteira)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
