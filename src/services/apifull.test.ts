@@ -227,3 +227,21 @@ describe('getApiFullProfile — envelope com o conteúdo agrupado em seções', 
     expect(extractPersonName({ SERVICE_RESPONSE: { cadastral: { nome: '  ' } } })).toBeUndefined();
   });
 });
+
+describe('getApiFullProfile — resposta que demorou (status 200, espaços antes do JSON)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('perfil chega normalmente mesmo com espaços antes do JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(`   ${JSON.stringify(successBody({ cadastral: { nome: 'M' } }))}`, { status: 200 })));
+    const profile = await getApiFullProfile(VALID_CPF);
+    expect(extractPersonName(profile)).toBe('M');
+  });
+
+  it('envelope de erro num 200 vira a mensagem neutra; not_found vira PersonNotFoundError', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('  {"code":"timeout","message":"A operação demorou mais que o esperado.","id":"x"}', { status: 200 })));
+    await expect(getApiFullProfile(VALID_CPF)).rejects.toThrow('A operação demorou mais que o esperado.');
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('  {"code":"not_found","message":"Nenhum resultado encontrado.","id":"x"}', { status: 200 })));
+    await expect(getApiFullProfile(VALID_CPF)).rejects.toBeInstanceOf(PersonNotFoundError);
+  });
+});

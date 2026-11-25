@@ -1,5 +1,6 @@
 import { isValidCPF, onlyDigits } from '../src/lib/format';
 import { requireSession } from './_lib/auth';
+import { respondWhenReady } from './_lib/slowResponse';
 import { mirrorImagesInPayload } from './_lib/imageMirror';
 import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from './_lib/upstreamError';
 
@@ -16,7 +17,8 @@ export const config = { runtime: 'edge' };
  */
 
 const MAX_BODY_BYTES = 2048; // {"cpf":"...","link":"cpf-ultra"} nunca chega perto disso
-const UPSTREAM_TIMEOUT_MS = 15000;
+/** O perfil completo pode passar de 15s; ver `respondWhenReady` para o limite da plataforma. */
+const UPSTREAM_TIMEOUT_MS = 60000;
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -109,6 +111,11 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
+  return respondWhenReady(consultar(validated.cpf, authorization));
+}
+
+/** Chamada externa + recorte + espelhamento de imagens. Sempre devolve uma Response (nunca lança). */
+async function consultar(cpf: string, authorization: string): Promise<Response> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -118,7 +125,7 @@ export default async function handler(req: Request): Promise<Response> {
     upstream = await fetch('https://api.apifull.com.br/api/cpf-ultra', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: authorization },
-      body: JSON.stringify({ cpf: validated.cpf, link: 'cpf-ultra' }),
+      body: JSON.stringify({ cpf, link: 'cpf-ultra' }),
       signal: controller.signal,
     });
   } catch (err) {

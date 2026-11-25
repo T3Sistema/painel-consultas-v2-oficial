@@ -1,6 +1,6 @@
 import { isValidCPF, isValidPhone, normalizePhone, onlyDigits } from '../lib/format';
 import { isPlainObject } from './personPayload';
-import { readNeutralErrorMessage } from './proxyError';
+import { neutralErrorFromBody, readNeutralErrorMessage } from './proxyError';
 
 /** Uma pessoa vinculada ao telefone pesquisado. */
 export interface PhoneMatch {
@@ -34,6 +34,11 @@ export async function findPeopleByPhone(telefone: string): Promise<PhoneMatch[]>
     data = await res.json();
   } catch {
     throw new Error('Não foi possível processar a resposta da consulta.');
+  }
+  const envelope = neutralErrorFromBody(data);
+  if (envelope) {
+    if (envelope.code === 'not_found') return [];
+    throw new Error(envelope.message);
   }
   if (!isPlainObject(data) || !Array.isArray(data.pessoas)) return [];
 

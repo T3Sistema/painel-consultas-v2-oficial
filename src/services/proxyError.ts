@@ -10,6 +10,18 @@
  */
 const GENERIC_MESSAGE = 'Não foi possível concluir a operação. Tente novamente em instantes.';
 
+/**
+ * Envelope de erro neutro dentro de um corpo JSON já lido — também aparece
+ * em respostas 200 quando a consulta demorou e o servidor precisou começar a
+ * responder antes de terminar (o status HTTP real se perde nesse caso).
+ */
+export function neutralErrorFromBody(body: unknown): { code: string; message: string } | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const { code, message } = body as { code?: unknown; message?: unknown };
+  if (typeof code !== 'string' || typeof message !== 'string' || !message.trim()) return null;
+  return { code, message };
+}
+
 export async function readNeutralErrorMessage(res: Response): Promise<string> {
   try {
     const body: unknown = await res.clone().json();

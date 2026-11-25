@@ -49,3 +49,23 @@ describe('findPeopleByPhone', () => {
     await expect(findPeopleByPhone('11987654321')).rejects.toThrow('Não foi possível concluir a operação. Tente novamente em instantes.');
   });
 });
+
+describe('findPeopleByPhone — resposta que demorou (status 200 com envelope de erro)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lê o envelope neutro mesmo com status 200 e espaços antes do JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('     {"code":"timeout","message":"A operação demorou mais que o esperado.","id":"ab"}', { status: 200 })),
+    );
+    await expect(findPeopleByPhone('11987654321')).rejects.toThrow('A operação demorou mais que o esperado.');
+  });
+
+  it('resultado com espaços antes do JSON é lido normalmente', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('   {"status":"sucesso","pessoas":[{"cpf":"11144477735","nome":"M"}]}', { status: 200 })),
+    );
+    expect(await findPeopleByPhone('11987654321')).toEqual([{ cpf: '11144477735', nome: 'M', nascimento: undefined }]);
+  });
+});

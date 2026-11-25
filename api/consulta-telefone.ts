@@ -1,5 +1,6 @@
 import { isValidCPF, isValidPhone, normalizePhone, onlyDigits } from '../src/lib/format';
 import { requireSession } from './_lib/auth';
+import { respondWhenReady } from './_lib/slowResponse';
 import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from './_lib/upstreamError';
 
 export const config = { runtime: 'edge' };
@@ -14,7 +15,8 @@ export const config = { runtime: 'edge' };
  */
 
 const MAX_BODY_BYTES = 2048;
-const UPSTREAM_TIMEOUT_MS = 20000;
+/** Consultas por telefone podem passar de 20s; ver `respondWhenReady` para o limite da plataforma. */
+const UPSTREAM_TIMEOUT_MS = 60000;
 /** Uma busca reversa nunca deveria devolver muito mais que isso; o excedente é descartado. */
 export const MAX_MATCHES = 30;
 
@@ -162,6 +164,11 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
+  return respondWhenReady(consultar(validated.telefone, authorization));
+}
+
+/** Chamada externa + recorte do resultado. Sempre devolve uma Response (nunca lança). */
+async function consultar(telefone: string, authorization: string): Promise<Response> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -171,7 +178,7 @@ export default async function handler(req: Request): Promise<Response> {
     upstream = await fetch('https://api.apifull.com.br/api/pessoa-telefone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: authorization },
-      body: JSON.stringify({ telefone: validated.telefone, link: 'pessoa-telefone' }),
+      body: JSON.stringify({ telefone, link: 'pessoa-telefone' }),
       signal: controller.signal,
     });
   } catch (err) {

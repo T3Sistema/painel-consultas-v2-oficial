@@ -1,6 +1,6 @@
 import { isValidCNPJ, isValidCPF, onlyDigits } from '../lib/format';
 import { isPlainObject, normalizePersonSections } from './personPayload';
-import { readNeutralErrorMessage } from './proxyError';
+import { neutralErrorFromBody, readNeutralErrorMessage } from './proxyError';
 
 /**
  * Perfil completo devolvido pela rota interna de consulta de pessoa, sempre
@@ -82,6 +82,12 @@ export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
     data = await res.json();
   } catch {
     throw new Error('Não foi possível processar a resposta da consulta.');
+  }
+
+  const envelope = neutralErrorFromBody(data);
+  if (envelope) {
+    if (envelope.code === 'not_found') throw new PersonNotFoundError(digits);
+    throw new Error(envelope.message);
   }
 
   const serviceResponse = readServiceResponse(data);
